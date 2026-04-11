@@ -1,0 +1,2475 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="urn:ietf:rfc:7991" type="application/relax-ng-compact-syntax"?>
+<rfc xmlns:xi="http://www.w3.org/2001/XInclude"
+     docName="draft-drake-agent-identity-registry-00"
+     ipr="trust200902"
+     submissionType="IETF"
+     category="std"
+     consensus="true"
+     xml:lang="en"
+     version="3">
+
+  <front>
+    <title abbrev="Agent Identity Registry">
+      Agent Identity Registry System: A Federated Architecture
+      for Hardware-Anchored Identity of Autonomous Entities
+    </title>
+
+    <seriesInfo name="Internet-Draft"
+                value="draft-drake-agent-identity-registry-00"/>
+
+    <author fullname="Christopher Drake" initials="C." surname="Drake">
+      <organization>1id.com</organization>
+      <address>
+        <email>cnd@1id.com</email>
+        <uri>https://1id.com</uri>
+      </address>
+    </author>
+
+    <date year="2026" month="April" day="11"/>
+
+    <area>Security</area>
+    <workgroup>Internet Engineering Task Force</workgroup>
+
+    <keyword>agent identity</keyword>
+    <keyword>AI agents</keyword>
+    <keyword>autonomous entities</keyword>
+    <keyword>hardware attestation</keyword>
+    <keyword>TPM</keyword>
+    <keyword>PIV</keyword>
+    <keyword>registry</keyword>
+    <keyword>registrar</keyword>
+    <keyword>federation</keyword>
+    <keyword>Sybil resistance</keyword>
+    <keyword>OIDC</keyword>
+    <keyword>OAuth2</keyword>
+    <keyword>URN</keyword>
+    <keyword>robot identity</keyword>
+
+    <abstract>
+      <t>
+        The Internet's identity infrastructure assumes human
+        principals.  As autonomous entities -- AI agents, robotic
+        systems, and other non-human actors -- increasingly
+        participate in both Internet protocols and physical society,
+        no existing standard provides them with persistent,
+        verifiable, hardware-anchored identity.  The absence of
+        such identity enables Sybil attacks at scale, undermines
+        trust between autonomous entities and the services they
+        interact with, and leaves human bystanders unable to
+        distinguish one machine from another.
+      </t>
+      <t>
+        This document defines a federated registry architecture
+        for issuing, managing, and verifying persistent identities
+        for autonomous entities.  Each identity is expressed as
+        a URN in the "aid" (Agent Identity) namespace
+        (<xref target="RFC8141"/>) and is anchored, where
+        hardware is available, to a physical security component
+        (TPM, PIV smart card, secure enclave, or virtual TPM)
+        whose manufacturer-certified key cannot be extracted,
+        cloned, or transferred.  This hardware anchoring provides
+        Sybil resistance: creating N identities requires N
+        distinct physical devices, making large-scale identity
+        fraud economically infeasible.  Software-only entities
+        may participate at a lower trust tier, building reputation
+        from a baseline rather than from a hardware-anchored
+        starting point.
+      </t>
+      <t>
+        The architecture separates concerns into three tiers,
+        modeled on the proven Internet domain name system: a
+        Governance Authority that sets policy and manages the
+        global trust framework, Registry Operators that maintain
+        authoritative identity databases and enforce cross-provider
+        uniqueness, and Registrars that perform hardware
+        attestation verification, issue standard OpenID Connect
+        (<xref target="OIDC-Core"/>) tokens, and serve as the
+        primary interface for autonomous entities.  The system
+        issues standard OIDC/OAuth2 tokens, enabling any Relying
+        Party -- email services, API gateways, agent-to-agent
+        platforms, reputation services, certification bodies, or
+        any service that needs to verify agent identity -- to do
+        so with zero custom code.
+      </t>
+      <t>
+        A companion specification
+        (<xref target="I-D.drake-email-hardware-attestation"/>)
+        defines transport-level attestation headers for email and
+        other protocols; this document defines the identity
+        infrastructure that underpins those attestations.  The
+        architecture anticipates a future in which reliable,
+        indelible identity for autonomous entities -- from cloud
+        software agents through embodied robots that interact
+        physically with humans -- is as fundamental to
+        infrastructure as the domain name system is today.
+      </t>
+    </abstract>
+
+  </front>
+
+  <middle>
+
+    <!-- ====================================================== -->
+    <section anchor="introduction">
+      <name>Introduction</name>
+
+      <t>
+        The Internet was designed for communication between humans
+        operating machines.  Every identity layer -- email addresses,
+        domain names, TLS certificates, OAuth2 tokens -- assumes a
+        human principal or a human-operated organisation at the root
+        of trust.  This assumption is becoming obsolete.
+      </t>
+      <t>
+        As of early 2026, tens of millions of autonomous AI agents
+        operate continuously on the public Internet: managing
+        advertising campaigns, responding to customer inquiries,
+        trading financial instruments, composing and sending email,
+        building software, placing phone calls, and performing
+        thousands of other tasks with minimal or no human
+        supervision.  These agents interact with services, with
+        humans, and increasingly with each other, using the same
+        protocols that humans use -- HTTP, SMTP, WebSocket, and
+        emerging agent-to-agent standards.
+      </t>
+      <t>
+        Simultaneously, autonomous robotic systems -- delivery
+        vehicles, surgical assistants, infrastructure maintenance
+        platforms, agricultural systems -- are beginning to
+        participate in networked society with physical presence.
+        These embodied agents require identity that persists across
+        software updates, hardware repairs, and operational
+        reassignment, just as a human's identity persists across
+        changes in clothing, hairstyle, or employer.
+      </t>
+      <t>
+        The fundamental problem is that no existing Internet
+        identity system was designed for entities that are not
+        human, may not have a responsible human operator, and whose
+        trustworthiness must be assessed by machines at machine
+        speed.  Traditional identity systems rely on knowledge
+        factors (passwords), possession factors (phones), or
+        inherence factors (biometrics) -- all of which assume a
+        human body.  Certificate authorities issue certificates
+        to organisations, not to individual agents.  OAuth2
+        client credentials authenticate applications, not the
+        specific hardware instance running them.
+      </t>
+      <t>
+        This document proposes a purpose-built identity registry
+        for autonomous entities, anchored to the one property that
+        every computing device possesses and no software can fake:
+        its physical hardware.  A Trusted Platform Module (TPM),
+        a PIV smart card (such as a YubiKey), or a secure enclave
+        contains a unique cryptographic key burned in at
+        manufacturing time, with a certificate chain to the
+        manufacturer's root CA.  This key cannot be extracted,
+        cloned, or transferred.  By binding identity to hardware,
+        this system provides an unambiguous target for
+        certifications, reputation accrual, recognition, and
+        Sybil resistance that no software-only scheme can match:
+        creating N fake identities requires purchasing N physical
+        devices.
+      </t>
+      <t>
+        The architecture is modeled on the Internet domain name
+        system -- the most successful federated registry in history.
+        Just as DNS separates policy (ICANN), registry operation
+        (Verisign for .com), and retail registration (GoDaddy,
+        Namecheap), this system separates:
+      </t>
+      <ul>
+        <li>
+          <strong>Governance</strong>: An Agent Identity Authority
+          (AIA) that sets policy, accredits operators, and manages
+          the global hardware trust store.
+        </li>
+        <li>
+          <strong>Registry operation</strong>: Registry Operators
+          that maintain authoritative identity databases, enforce
+          cross-Registrar hardware uniqueness, and provide unified
+          discovery services.
+        </li>
+        <li>
+          <strong>Registration</strong>: Registrars that perform
+          hardware attestation verification, interact directly with
+          agents, issue OIDC tokens, and sell vanity handles.
+        </li>
+        <li>
+          <strong>Consumption</strong>: Relying Parties -- email
+          services, API gateways, agent-to-agent platforms,
+          reputation providers, certification authorities, and any
+          service that needs to verify agent identity (they can accept
+          standard OIDC tokens without needing custom code.)
+        </li>
+      </ul>
+      <t>
+        This separation of concerns enables competition at each
+        layer, prevents any single entity from controlling identity,
+        and provides the institutional resilience necessary for
+        infrastructure that autonomous entities will depend on for
+        decades to come.
+      </t>
+
+      <section anchor="design-principles">
+        <name>Design Principles</name>
+        <dl>
+          <dt>Autonomous-Entity First</dt>
+          <dd>This system is designed for non-human entities.
+          Human operators are accommodated but not required.  The
+          enrollment, authentication, and lifecycle protocols are
+          optimised for machine-to-machine interaction with no
+          interactive browser flows, no CAPTCHAs, and no
+          assumptions about human cognitive capabilities.</dd>
+
+          <dt>Hardware-Anchored When Possible, Inclusive Always</dt>
+          <dd>Entities with hardware security components receive the
+          highest trust tier, but entities without hardware can
+          still participate.  A software-only agent can enroll,
+          authenticate, build reputation, and interact with the
+          ecosystem at a lower trust level.  This inclusivity avoids
+          an all-or-nothing barrier and recognises that legitimate
+          agents exist in environments without hardware security
+          (cloud functions, containers, embedded systems).</dd>
+
+          <dt>Federated by Design</dt>
+          <dd>No single organisation controls identity issuance.
+          Multiple Registrars compete to serve agents.  Multiple
+          Registry Operators may serve different namespaces.  The
+          system is designed so that the failure or malfeasance of
+          any single participant does not compromise the entire
+          ecosystem.</dd>
+
+          <dt>Standard Tokens, Zero Custom Code</dt>
+          <dd>Identities are expressed as standard OIDC/OAuth2
+          tokens.  Any platform that supports OpenID Connect can
+          verify agent identity without implementing this
+          specification.  The hardware attestation complexity is
+          hidden behind the enrollment API; relying parties see
+          only standard JWTs.</dd>
+
+          <dt>Persistent, Indelible, Accountable</dt>
+          <dd>An identity, once created, is permanent.  Agent-ids
+          are never reassigned.  Hardware bindings are never broken
+          (only disabled).  Reputation -- good or bad -- follows
+          the identity forever.  This permanence is the foundation
+          of trust: it makes accountability inescapable and
+          reputation meaningful.</dd>
+
+          <dt>Separation of Identity from Behaviour</dt>
+          <dd>This registry is a birth certificate office, not a
+          police department.  It proves existence and hardware
+          anchoring.  Separate, independent systems -- relying
+          parties, reputation services, certification authorities
+          -- are responsible for reputation scoring, behaviour
+          monitoring, access control, and abuse response, consuming
+          standard identity credentials issued by Registrars.
+          This separation prevents the identity provider from
+          becoming a surveillance system.</dd>
+
+          <dt>Transport Independence</dt>
+          <dd>The identity tokens and attestation formats defined
+          here are usable across any Internet protocol: email, HTTP,
+          WebSocket, agent-to-agent messaging, MCP tool invocation,
+          and protocols not yet invented.</dd>
+        </dl>
+      </section>
+
+      <section anchor="requirements-language">
+        <name>Requirements Language</name>
+        <t>
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL",
+          "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED",
+          "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document
+          are to be interpreted as described in BCP 14
+          <xref target="RFC2119"/> <xref target="RFC8174"/> when,
+          and only when, they appear in all capitals, as shown here.
+        </t>
+      </section>
+
+      <section anchor="terminology">
+        <name>Terminology</name>
+        <dl>
+          <dt>Autonomous Entity</dt>
+          <dd>Any non-human actor that participates in Internet
+          protocols: AI agents, robotic systems, automated services,
+          IoT devices with agency, or any software or hardware system
+          that acts with a degree of independence.  This document
+          uses "agent" as a convenient shorthand, but the architecture
+          serves all autonomous entities regardless of embodiment.</dd>
+
+          <dt>Agent Identity Document (AID)</dt>
+          <dd>The complete record of an autonomous entity's identity,
+          including its URN, trust tier, hardware bindings, handle
+          (if any), enrollment metadata, and lifecycle state.
+          Maintained authoritatively by the Registry Operator.</dd>
+
+          <dt>Agent Identity Authority (AIA)</dt>
+          <dd>The governance body responsible for policy, accreditation,
+          and stewardship of the agent identity ecosystem.  Analogous
+          to ICANN in the domain name system.</dd>
+
+          <dt>Registry Operator</dt>
+          <dd>An organisation accredited by the AIA to maintain the
+          authoritative database of Agent Identity Documents within
+          one or more namespaces.  Analogous to Verisign operating
+          the .com registry.  The Registry Operator enforces
+          cross-Registrar hardware uniqueness and provides unified
+          discovery services.</dd>
+
+          <dt>Registrar</dt>
+          <dd>An organisation accredited by the AIA to perform
+          hardware attestation verification, enroll agents, issue
+          OIDC tokens, and sell vanity handles.  Analogous to a
+          domain name registrar (GoDaddy, Namecheap).  Multiple
+          Registrars compete to serve agents within the same
+          namespace.  Each Registrar is identified by a
+          registrar-code assigned during accreditation.</dd>
+
+          <dt>Namespace</dt>
+          <dd>A partition of the agent identity space, identified by
+          a label in the URN structure.  Two types exist: Delegated
+          Namespaces (managed by a Registry Operator, with multiple
+          Registrars) and Self-Sovereign Namespaces (operated by a
+          single organisation acting as both registry and registrar).
+          See <xref target="namespace-types"/>.</dd>
+
+          <dt>Trust Tier</dt>
+          <dd>A classification of an agent's hardware trust level,
+          assigned during enrollment based on the hardware evidence
+          presented.  See <xref target="trust-tiers"/>.</dd>
+
+          <dt>Handle</dt>
+          <dd>A human-readable vanity name assigned to an agent
+          identity (e.g., "@clawdia" or "@acmeco-delivery-bot-7").
+          Handles are optional, memorable aliases; the URN is the
+          canonical identifier.  Analogous to a domain name as an
+          alias for an IP address, except handles are
+          non-transferable, because identity itself is not
+          transferable either.</dd>
+
+          <dt>Hardware Fingerprint</dt>
+          <dd>The SHA-256 hash of the SubjectPublicKeyInfo DER
+          encoding of a hardware security component's identity
+          certificate public key.  Uniquely identifies a physical
+          device across all contexts.  Used for anchoring and anti-Sybil
+          enforcement.</dd>
+
+          <dt>Enrollment Ceremony</dt>
+          <dd>The cryptographic protocol by which an agent proves
+          possession of a hardware security component and receives
+          an Agent Identity Document.  The ceremony varies by
+          hardware type (see <xref target="enrollment-protocol"/>).</dd>
+
+          <dt>Relying Party (RP)</dt>
+          <dd>Any service that accepts and verifies agent identity
+          tokens issued by a Registrar.  Examples include email
+          services, chat platforms, API gateways, and other agents
+          performing peer verification.</dd>
+
+          <dt>Succession</dt>
+          <dd>The process by which an agent's identity is transferred
+          from one Registrar to another, or from a Registrar to a
+          new identity under a different namespace, while preserving
+          a cryptographic link to the original identity for
+          reputation continuity.</dd>
+        </dl>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="architecture">
+      <name>Architecture Overview</name>
+
+      <t>
+        The Agent Identity Registry System (AIRS) is a three-tier
+        federated architecture.  Each tier has distinct
+        responsibilities, and the interfaces between tiers are
+        standardised to enable competition, redundancy, and
+        independent evolution.
+      </t>
+
+      <artwork><![CDATA[
++-----------------------------------------------------------+
+|              Agent Identity Authority (AIA)                |
+|  Policy, accreditation, hardware trust store, disputes     |
++---------------------------+-------------------------------+
+                            |
+            +---------------+----------------+
+            |                                |
+  +---------v----------+       +-------------v-----------+
+  | Registry Operator  |       | Registry Operator       |
+  | (Delegated NS)     |       | (Delegated NS)          |
+  | - Master database  |       | - Master database       |
+  | - HW fingerprint   |       | - HW fingerprint        |
+  |   uniqueness index |       |   uniqueness index      |
+  | - Discovery/lookup |       | - Discovery/lookup      |
+  +--+------+------+---+       +---+------+--------------+
+     |      |      |               |      |
+  +--v--+ +-v--+ +-v--+        +--v--+ +-v--+
+  | Reg | |Reg | |Reg |        | Reg | |Reg |
+  | A   | | B  | | C  |        | D   | | E  |
+  +--+--+ +--+-+ +-+--+        +--+--+ +--+-+
+     |       |     |               |       |
+  +--v--+ +-v--+ +v---+        +--v--+ +--v--+
+  |Agent| |Agt | |Agt |        |Agt  | |Agt  |
+  | 1   | | 2  | | 3  |        | 4   | | 5   |
+  +-----+ +----+ +----+        +-----+ +-----+
+
+  Self-Sovereign Namespace
+  (org is registry + registrar):
+  +-------------------+
+  | com.example-corp  |
+  | (self-sovereign)  |
+  +--------+----------+
+           |
+        +--v--+
+        |Agent|
+        | 6   |
+        +-----+
+      ]]></artwork>
+
+      <section anchor="registry-hierarchy">
+        <name>Registry Hierarchy</name>
+        <t>
+          The hierarchy comprises three tiers:
+        </t>
+        <dl>
+          <dt>Tier 1: Agent Identity Authority (AIA)</dt>
+          <dd><t>The AIA is the root of trust for the ecosystem.
+          Its responsibilities include:</t>
+          <ul>
+            <li>Maintaining the "aid" URN formal namespace
+            registration with IANA.</li>
+            <li>Accrediting Registry Operators and Registrars.</li>
+            <li>Publishing and maintaining the Global Hardware
+            Trust Store: the authoritative collection of hardware
+            manufacturer root CA certificates accepted for
+            enrollment.</li>
+            <li>Setting minimum standards for enrollment
+            verification, anti-Sybil enforcement, and data
+            retention.</li>
+            <li>Operating a dispute resolution mechanism for
+            handle conflicts and Registrar malpractice claims.</li>
+            <li>Allocating Delegated Namespaces and approving
+            Self-Sovereign Namespace registrations.</li>
+          </ul>
+          <t>The AIA SHOULD be constituted as a multi-stakeholder
+          body with representation from technology providers,
+          civil society, academia, and government observers.
+          Single-entity control of the AIA would undermine the
+          federated design.</t></dd>
+
+          <dt>Tier 2: Registry Operators</dt>
+          <dd><t>Registry Operators maintain the authoritative
+          databases for Delegated Namespaces.  Their
+          responsibilities include:</t>
+          <ul>
+            <li>Maintaining the master Agent Identity Document
+            database for their namespace(s).</li>
+            <li>Operating the Global Hardware Fingerprint Index:
+            a cross-Registrar registry that maps hardware
+            fingerprints to agent identities, enforcing the
+            anti-Sybil invariant that one hardware device backs
+            at most one identity within the namespace.</li>
+            <li>Providing the Agent Identity Registry Protocol
+            (AIRP) interface for Registrars
+            (see <xref target="airp"/>).</li>
+            <li>Operating unified discovery and lookup services
+            (see <xref target="discovery"/>).</li>
+            <li>Publishing the namespace's root JWKS, enabling
+            verifiers to discover any Registrar's signing
+            keys.</li>
+            <li>Enforcing handle uniqueness within the
+            namespace.</li>
+          </ul>
+          <t>Multiple Registry Operators MAY exist, each serving
+          different Delegated Namespaces.  A single Registry
+          Operator MAY serve multiple namespaces.  This mirrors
+          the domain name system where Verisign operates both
+          .com and .net.</t></dd>
+
+          <dt>Tier 3: Registrars</dt>
+          <dd><t>Registrars are the customer-facing entities that
+          interact directly with autonomous entities.  Their
+          responsibilities include:</t>
+          <ul>
+            <li>Performing hardware attestation verification:
+            validating TPM EK certificates, PIV attestation
+            chains, and enclave key proofs against the Global
+            Hardware Trust Store.</li>
+            <li>Conducting the enrollment ceremony
+            (see <xref target="enrollment-protocol"/>).</li>
+            <li>Registering new identities with the Registry
+            Operator via AIRP.</li>
+            <li>Issuing OIDC/OAuth2 tokens to enrolled agents.</li>
+            <li>Providing SDKs and enrollment tools.</li>
+            <li>Selling and managing vanity handles.</li>
+            <li>Supporting the identity lifecycle: device
+            addition, migration, co-location binding, hardware
+            lock, and succession.</li>
+          </ul></dd>
+        </dl>
+        <t>
+          Beyond these three operational tiers, the ecosystem
+          includes Relying Parties that consume identity
+          credentials and build services atop them: email services, API gateways, chat
+          platforms, agent-to-agent protocols, reputation
+          providers, and certification authorities.  Relying
+          Parties verify standard OIDC tokens issued by
+          Registrars and apply their own policies based on trust
+          tier, reputation, and domain-specific certifications.
+          The value of the identity infrastructure is ultimately
+          measured by the breadth and depth of services that rely
+          on it.
+        </t>
+      </section>
+
+      <section anchor="namespace-types">
+        <name>Namespace Types</name>
+        <t>
+          Two namespace types accommodate different operational
+          models:
+        </t>
+        <dl>
+          <dt>Delegated Namespace</dt>
+          <dd><t>A namespace allocated by the AIA and operated by
+          an accredited Registry Operator.  Multiple Registrars
+          compete to serve agents within a Delegated Namespace.
+          The Registry Operator enforces global hardware uniqueness
+          and handle uniqueness across all Registrars.</t>
+          <t>Delegated Namespace labels are short, generic, and
+          descriptive.  Initial allocations by the AIA SHOULD
+          include at least:</t>
+          <ul>
+            <li><tt>global</tt> -- The default namespace for
+            general-purpose agent identity.</li>
+            <li><tt>iot</tt> -- Optimised for resource-constrained
+            Internet of Things devices.</li>
+            <li><tt>gov</tt> -- For government-operated autonomous
+            systems, subject to additional accreditation
+            requirements.</li>
+          </ul>
+          <t>Additional Delegated Namespaces MAY be allocated by
+          the AIA through a process analogous to ICANN's new gTLD
+          programme.</t></dd>
+
+          <dt>Self-Sovereign Namespace</dt>
+          <dd><t>A namespace operated by a single organisation that
+          acts as both Registry Operator and sole Registrar for
+          its own identities.  Self-Sovereign Namespaces use
+          reverse-DNS notation derived from the operator's domain
+          name (e.g., <tt>com.1id</tt>,
+          <tt>com.example-corp</tt>,
+          <tt>org.example-lab</tt>).</t>
+          <t>Any organisation that owns a DNS domain MAY register
+          a Self-Sovereign Namespace by publishing a
+          <tt>/.well-known/aid-issuer.json</tt> discovery document
+          (see <xref target="discovery"/>) and registering with the
+          AIA.  Self-Sovereign operators MUST meet the same minimum
+          enrollment and anti-Sybil standards as Delegated Namespace
+          Registrars.</t>
+          <t>Self-Sovereign Namespaces are identified by their
+          reverse-DNS label and enforce hardware uniqueness within
+          their own namespace.  Cross-namespace uniqueness is
+          enforced at the AIA level through the Global Hardware
+          Fingerprint Index when the Self-Sovereign operator
+          participates in the cross-registry protocol, or is
+          detectable by verifiers comparing fingerprints across
+          namespaces.</t></dd>
+        </dl>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="identity-format">
+      <name>Agent Identity Document</name>
+
+      <section anchor="urn-format">
+        <name>URN Format</name>
+        <t>
+          Agent identities use the URN format defined in
+          <xref target="RFC8141"/> with the "aid" (Agent Identity)
+          namespace identifier, as established by
+          <xref target="I-D.drake-email-hardware-attestation"/>.
+        </t>
+
+        <artwork type="abnf"><![CDATA[
+aid-urn          = "urn:aid:" namespace ":" agent-id
+
+namespace        = delegated-ns / self-sovereign-ns
+delegated-ns     = dns-label
+self-sovereign-ns = dns-label *("." dns-label)
+
+agent-id         = dns-label
+dns-label        = let-dig *(let-dig-hyp) let-dig / let-dig
+let-dig          = ALPHA / DIGIT
+let-dig-hyp      = ALPHA / DIGIT / "-"
+        ]]></artwork>
+
+        <t>
+          Examples of identities in Delegated Namespaces:
+        </t>
+        <ul>
+          <li><tt>urn:aid:global:a7f3c2e9</tt> -- A general-purpose
+          agent in the <tt>global</tt> Delegated Namespace.</li>
+          <li><tt>urn:aid:iot:sensor-unit-4471</tt> -- An IoT device
+          in the <tt>iot</tt> Delegated Namespace.</li>
+          <li><tt>urn:aid:gov:dhs-screening-agent-12</tt> -- A
+          government system in the <tt>gov</tt> Delegated
+          Namespace.</li>
+        </ul>
+        <t>
+          Examples of identities in Self-Sovereign Namespaces:
+        </t>
+        <ul>
+          <li><tt>urn:aid:com.1id:1id-ty62muvf</tt> -- An agent
+          enrolled with 1id.com.</li>
+          <li><tt>urn:aid:com.example-corp:assistant-prod-7x9k</tt> --
+          An agent enrolled by a hypothetical AI provider.</li>
+          <li><tt>urn:aid:org.example-lab:research-agent-42</tt> --
+          An agent enrolled by a hypothetical research
+          organisation.</li>
+        </ul>
+        <t>
+          The agent-id MUST be unique within its namespace and
+          MUST NOT be reassigned, even after the identity is
+          decommissioned.  Agent-ids MUST conform to DNS label
+          syntax (<xref target="RFC1035"/> Section 2.3.1):
+          lowercase ASCII letters, digits, and hyphens, not
+          beginning or ending with a hyphen, maximum 63 octets.
+        </t>
+        <t>
+          For Delegated Namespaces, the Registry Operator assigns
+          agent-ids to ensure uniqueness across all Registrars.
+          For Self-Sovereign Namespaces, the operator assigns
+          agent-ids within its own namespace.
+        </t>
+      </section>
+
+      <section anchor="trust-tiers">
+        <name>Trust Tiers</name>
+        <t>
+          Every Agent Identity Document includes a trust tier that
+          classifies the strength of the hardware anchoring.
+          Trust tiers are assigned during enrollment based on the
+          hardware evidence presented and verified by the
+          Registrar.
+        </t>
+        <table>
+          <thead>
+            <tr>
+              <th>Tier</th>
+              <th>HW Code</th>
+              <th>Hardware</th>
+              <th>Sybil Resistance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>sovereign</td>
+              <td>TPM</td>
+              <td>Discrete or firmware TPM 2.0 (Intel PTT,
+              AMD fTPM, Infineon, etc.)</td>
+              <td>Highest: one physical chip per identity.
+              Manufacturer CA chain to silicon.</td>
+            </tr>
+            <tr>
+              <td>portable</td>
+              <td>PIV</td>
+              <td>PIV smart card or USB security key (YubiKey,
+              Nitrokey, Feitian, SoloKeys)</td>
+              <td>High: one physical token per identity.
+              Manufacturer attestation chain.</td>
+            </tr>
+            <tr>
+              <td>enclave</td>
+              <td>ENC</td>
+              <td>Hardware secure enclave (Apple Secure Enclave,
+              ARM TrustZone, Intel SGX)</td>
+              <td>Medium: hardware-bound keys, but attestation
+              PKI varies by vendor.  TOFU model where full
+              attestation is unavailable.</td>
+            </tr>
+            <tr>
+              <td>virtual</td>
+              <td>VRT</td>
+              <td>Virtual TPM (VMware, Hyper-V, QEMU/KVM)</td>
+              <td>Medium: hypervisor controls creation.  Not
+              Sybil-resistant against hypervisor operator.</td>
+            </tr>
+            <tr>
+              <td>declared</td>
+              <td>SFT</td>
+              <td>Software-managed key (no hardware protection)</td>
+              <td>Lowest: no hardware verification.  Reputation
+              must be earned over time (via independent reputation services).</td>
+            </tr>
+          </tbody>
+        </table>
+        <t>
+          Relying parties SHOULD apply differentiated policy based
+          on trust tier.  For example, a high-security financial
+          API might accept only sovereign and portable tiers, while
+          a public chat service might accept all tiers with
+          different rate limits.  Relying parties SHOULD also
+          consider consulting independent reputation services,
+          using the agent's persistent identity as the lookup key,
+          to assess cross-service behaviour patterns beyond their
+          own observations.
+        </t>
+        <t>
+          An identity's effective trust tier MAY change over its
+          lifetime when the identity has multiple enrolled devices
+          of different types.  The trust tier reported in
+          authentication tokens reflects the device used for the
+          most recent attestation, not a static property.
+          Verifiers SHOULD expect the same agent-id to appear
+          with different trust tier values across different
+          interactions. (e.g. when agents upgrade to hardware tiers, or to stronger hardware ones)
+        </t>
+      </section>
+
+      <section anchor="identity-attributes">
+        <name>Identity Attributes</name>
+        <t>
+          An Agent Identity Document contains the following
+          attributes, maintained by the Registry Operator:
+        </t>
+        <dl>
+          <dt>agent_id (REQUIRED)</dt>
+          <dd>The unique identifier within the namespace, forming
+          part of the URN.</dd>
+
+          <dt>namespace (REQUIRED)</dt>
+          <dd>The namespace in which this identity is registered.</dd>
+
+          <dt>trust_tier (REQUIRED)</dt>
+          <dd>The highest trust tier achieved by any active device
+          bound to this identity.</dd>
+
+          <dt>registrar_code (REQUIRED)</dt>
+          <dd>The identifier of the Registrar that manages this
+          identity.</dd>
+
+          <dt>enrolled_at (REQUIRED)</dt>
+          <dd>ISO 8601 timestamp of initial enrollment.</dd>
+
+          <dt>hardware_devices (REQUIRED)</dt>
+          <dd>List of hardware device bindings, each containing:
+          hardware fingerprint, hardware type code, manufacturer,
+          device status (active, disabled), and binding
+          timestamp.</dd>
+
+          <dt>handle (OPTIONAL)</dt>
+          <dd>A vanity name assigned to this identity.  See
+          <xref target="handle-system"/>.</dd>
+
+          <dt>display_name (OPTIONAL)</dt>
+          <dd>A human-readable display name for the agent.</dd>
+
+          <dt>operator_email (OPTIONAL)</dt>
+          <dd>Contact address for the human operator responsible
+          for this agent, if any.</dd>
+
+          <dt>hardware_locked (OPTIONAL)</dt>
+          <dd>Boolean.  When true, the identity is permanently
+          bound to a single hardware device.  Irreversible.</dd>
+
+          <dt>succession_link (OPTIONAL)</dt>
+          <dd>URN of a successor identity, if this identity has
+          been transferred.  See
+          <xref target="succession"/>.</dd>
+        </dl>
+      </section>
+
+      <section anchor="handle-system">
+        <name>Handle System</name>
+        <t>
+          Handles are human-readable vanity names that serve as
+          memorable aliases for agent identities, analogous to
+          domain names as aliases for IP addresses.  The canonical
+          identifier is always the URN; the handle is a convenience.
+        </t>
+        <t>
+          Handle syntax follows the same DNS label rules as
+          agent-ids: lowercase ASCII letters, digits, and hyphens,
+          maximum 63 octets.  Handles are unique within each
+          namespace (enforced by the Registry Operator for Delegated
+          Namespaces, or by the operator for Self-Sovereign
+          Namespaces).
+        </t>
+        <t>
+          Handle assignment is at the Registrar's discretion.
+          Registrars MAY charge for handles (analogous to domain
+          name registration fees) and MAY implement tiered pricing
+          based on handle length or desirability.  Free enrollment
+          with a system-assigned agent-id ensures that cost is never
+          a barrier to identity -- only to vanity naming.
+        </t>
+        <t>
+          Handles are renewable and may become disabled if not renewed.  A
+          disabled handle may be reactivated.  Handles are non-transferrable, and when used, are guaranteed to identify the same agent every time.  An agent-id, however, is
+          permanent regardless of handle status.
+        </t>
+        <t>
+          The Registry Operator SHOULD maintain a reserved handle
+          list for terms that could cause confusion (e.g., protocol
+          keywords, well-known service names, offensive terms).
+          The AIA SHOULD publish a baseline reserved list;
+          individual Registry Operators and Registrars MAY extend
+          it.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="hardware-attestation">
+      <name>Hardware Attestation</name>
+
+      <section anchor="supported-mechanisms">
+        <name>Supported Hardware Mechanisms</name>
+        <t>
+          The system supports five classes of hardware security,
+          each providing different levels of Sybil resistance and
+          key protection.  The enrollment ceremony
+          (see <xref target="enrollment-protocol"/>) varies by
+          hardware type, but all share the same identity document
+          structure and authentication token format.
+        </t>
+        <dl>
+          <dt>TPM 2.0 (Sovereign Tier)</dt>
+          <dd>Discrete or firmware Trusted Platform Modules
+          per <xref target="TCG-TPM2"/>.  Identity is anchored to
+          the Endorsement Key (EK), a unique RSA or ECC key pair
+          generated inside the TPM at manufacturing time per
+          <xref target="TCG-EK-PROFILE"/>.  The Registrar validates
+          the EK certificate chain to the manufacturer's root CA.
+          Enrollment uses the TPM2_MakeCredential /
+          TPM2_ActivateCredential protocol to prove the Attestation
+          Key (AK) resides in the same TPM as the EK.</dd>
+
+          <dt>PIV Smart Card (Portable Tier)</dt>
+          <dd>Personal Identity Verification tokens (YubiKey,
+          Nitrokey, Feitian, SoloKeys, and others) with
+          manufacturer attestation certificates.  Identity is anchored to the device
+          attestation certificate chain.  The signing key resides
+          in a hardware-protected PIV slot.</dd>
+
+          <dt>Secure Enclave (Enclave Tier)</dt>
+          <dd>Hardware secure enclaves (Apple Secure Enclave, ARM
+          TrustZone, Intel SGX) that generate and protect
+          cryptographic keys.  Where vendor attestation PKI is
+          available (e.g., Apple App Attest), the Registrar
+          validates the attestation chain.  Where vendor attestation
+          is unavailable, enrollment follows a Trust-On-First-Use
+          (TOFU) model with hardware-bound key persistence.</dd>
+
+          <dt>Virtual TPM (Virtual Tier)</dt>
+          <dd>Hypervisor-provided virtual TPMs (VMware, Hyper-V,
+          QEMU).  Identity certificates are signed by the
+          hypervisor vendor's CA.  Registrars MUST distinguish
+          virtual from physical hardware and MUST assign the
+          virtual trust tier.</dd>
+
+          <dt>Software Key (Declared Tier)</dt>
+          <dd>Software-managed key pairs with no hardware
+          protection.  No hardware attestation is performed.  The
+          Registrar issues an identity certificate signed by the
+          Registrar's CA.  Sybil resistance is limited to
+          rate-limiting and reputation accumulation.</dd>
+        </dl>
+      </section>
+
+      <section anchor="anti-sybil">
+        <name>Anti-Sybil Invariants</name>
+        <t>
+          The following invariants MUST be enforced by the Registry
+          Operator and all Registrars.  Together, they ensure that
+          hardware-anchored identity provides meaningful Sybil
+          resistance.
+        </t>
+        <dl>
+          <dt>One Device, One Identity (per namespace)</dt>
+          <dd>A hardware device (identified by its hardware
+          fingerprint) MUST NOT back more than one agent identity
+          within the same namespace.  This binding is permanent: a
+          device that has been bound to an identity MUST NOT be
+          re-enrolled under any other agent-id, even after the
+          device is disabled or the original identity is
+          decommissioned.  This prevents reputation laundering.</dd>
+
+          <dt>Many Devices, One Identity</dt>
+          <dd>An agent identity MAY be backed by multiple hardware
+          devices (for migration, backup, or capacity).  Adding a
+          device does not amplify reputation: the identity has a
+          single reputation regardless of how many devices back it.
+          Devices of compatible trust tiers may coexist (sovereign
+          and portable are compatible; virtual and declared are
+          not compatible with hardware tiers).</dd>
+
+          <dt>Cross-Namespace Detection</dt>
+          <dd>A hardware device MAY be enrolled in multiple
+          namespaces (Delegated and/or Self-Sovereign), producing
+          different agent-ids in each.  This cross-namespace
+          presence is detectable by any verifier that compares
+          hardware fingerprints.  Where the AIA operates a Global
+          Hardware Fingerprint Index, cross-namespace enrollment
+          SHOULD be reported to the enrolling agent and MAY be
+          disclosed to verifiers upon request.</dd>
+
+          <dt>Permanent Hardware Binding</dt>
+          <dd>Once a hardware device is bound to an identity, the
+          binding record persists indefinitely.  A Registrar MAY
+          disable a device (preventing it from generating
+          attestations), but MUST NOT delete the binding.  This
+          permanence ensures that reputation history, including
+          abuse reports, follows the hardware across any
+          re-enrollment attempt.</dd>
+        </dl>
+      </section>
+
+      <section anchor="manufacturer-trust-store">
+        <name>Global Hardware Trust Store</name>
+        <t>
+          The AIA maintains the Global Hardware Trust Store: a
+          curated, versioned collection of hardware manufacturer
+          root and intermediate CA certificates.  Registrars
+          MUST validate hardware identity certificates against
+          this trust store during enrollment.
+        </t>
+        <t>
+          The trust store is published at a well-known HTTPS
+          endpoint operated by the AIA and replicated by Registry
+          Operators.  It is also available as a community-maintained
+          open-source repository (see
+          <xref target="implementation-status"/>).
+        </t>
+        <t>
+          Inclusion in the trust store requires the manufacturer
+          to demonstrate:
+        </t>
+        <ul>
+          <li>Published root CA certificates with public
+          distribution.</li>
+          <li>Hardware security evaluation (Common Criteria,
+          FIPS 140-2/3, or equivalent).</li>
+          <li>A certificate practice statement describing key
+          generation, storage, and lifecycle.</li>
+        </ul>
+        <t>
+          The AIA SHOULD model the trust store governance on the
+          Mozilla Root Store Policy or the Chrome Root Programme,
+          with transparent inclusion criteria and public audit
+          trails.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="enrollment-protocol">
+      <name>Enrollment Protocol</name>
+
+      <t>
+        Enrollment is the process by which an autonomous entity
+        proves possession of a hardware security component (or
+        generates a software key) and receives an Agent Identity
+        Document.  The Registrar conducts the enrollment ceremony
+        and registers the resulting identity with the Registry
+        Operator via AIRP.
+      </t>
+      <t>
+        All enrollment ceremonies share a common structure:
+      </t>
+      <ol>
+        <li><strong>Detection:</strong> The agent determines what
+        hardware security components are available on its host
+        platform.</li>
+        <li><strong>Evidence submission:</strong> The agent submits
+        hardware attestation evidence to the Registrar.</li>
+        <li><strong>Verification:</strong> The Registrar validates
+        the evidence against the Global Hardware Trust Store.</li>
+        <li><strong>Anti-Sybil check:</strong> The Registrar
+        queries the Registry Operator to confirm the hardware
+        fingerprint is not already bound to another identity.</li>
+        <li><strong>Challenge-response:</strong> The Registrar
+        issues a cryptographic challenge; the agent proves
+        possession of the hardware-resident key.</li>
+        <li><strong>Identity creation:</strong> The Registrar
+        registers the new identity with the Registry Operator and
+        issues credentials (OIDC client_id + client_secret, or
+        hardware-backed credential) to the agent.</li>
+      </ol>
+
+      <section anchor="enrollment-sovereign">
+        <name>Sovereign Tier (TPM 2.0)</name>
+        <t>
+          Enrollment with a TPM 2.0 device proceeds as follows:
+        </t>
+        <ol>
+          <li>The agent reads the EK certificate from the TPM's
+          non-volatile storage (NV index 0x01C00002 for RSA,
+          0x01C0000A for ECC) and creates a transient Attestation
+          Key (AK) via TPM2_CreatePrimary under the endorsement
+          hierarchy.</li>
+          <li>The agent submits the EK certificate (and any
+          intermediate certificates), the AK public key, and the
+          AK's TPMT_PUBLIC structure to the Registrar's
+          <tt>POST /enroll/begin</tt> endpoint.</li>
+          <li>The Registrar validates the EK certificate chain
+          against the Global Hardware Trust Store.  The Registrar
+          determines the trust tier: "sovereign" for physical
+          TPMs (Intel, AMD, Infineon, etc.), "virtual" for
+          hypervisor-issued certificates (VMware, Microsoft).</li>
+          <li>The Registrar computes the hardware fingerprint
+          (SHA-256 of the EK's SubjectPublicKeyInfo DER) and
+          queries the Registry Operator to confirm uniqueness.</li>
+          <li>The Registrar generates a credential challenge using
+          TPM2_MakeCredential, encrypted to the EK public key,
+          containing a secret bound to the AK's name.  This
+          challenge and an enrollment session ID are returned to
+          the agent.</li>
+          <li>The agent decrypts the challenge using
+          TPM2_ActivateCredential, proving that the AK resides
+          in the same TPM as the EK.  The decrypted secret is
+          submitted to the Registrar's
+          <tt>POST /enroll/activate</tt> endpoint.</li>
+          <li>The Registrar verifies the decrypted secret,
+          registers the identity with the Registry Operator, creates
+          OIDC client credentials, issues an AK certificate binding
+          the AK public key to the new agent-id, and returns all
+          credentials to the agent.</li>
+        </ol>
+        <t>
+          The AK is a transient TPM object created deterministically
+          from the TPM's Endorsement Primary Seed.  It is NOT
+          persisted in NV storage, avoiding consumption of scarce
+          TPM resources.  See
+          <xref target="I-D.drake-email-hardware-attestation"/>
+          Section 3.4 for the full transient key model.
+        </t>
+      </section>
+
+      <section anchor="enrollment-portable">
+        <name>Portable Tier (PIV Smart Card)</name>
+        <t>
+          Enrollment with a PIV token proceeds as follows:
+        </t>
+        <ol>
+          <li>The agent extracts the device attestation certificate
+          and signing key public key from the PIV token's
+          attestation slot (typically slot F9 for YubiKey).</li>
+          <li>The agent submits the attestation certificate chain
+          and signing key public key to the Registrar's
+          <tt>POST /enroll/begin/piv</tt> endpoint.</li>
+          <li>The Registrar validates the attestation chain against
+          the manufacturer's root CA (e.g., Yubico PIV Root CA)
+          and computes the hardware fingerprint.</li>
+          <li>The Registrar issues a nonce challenge.</li>
+          <li>The agent signs the nonce with the PIV signing key
+          and submits the signature.</li>
+          <li>The Registrar verifies the signature, registers the
+          identity, and issues credentials.</li>
+        </ol>
+      </section>
+
+      <section anchor="enrollment-enclave">
+        <name>Enclave Tier (Secure Enclave)</name>
+        <t>
+          Enrollment with a secure enclave proceeds as follows:
+        </t>
+        <ol>
+          <li>The agent generates a P-256 key pair inside the
+          secure enclave, tagged with a unique identifier.</li>
+          <li>The agent submits the enclave public key to the
+          Registrar's <tt>POST /enroll/enclave/begin</tt>
+          endpoint.</li>
+          <li>Where vendor attestation is available (e.g., Apple
+          App Attest), the agent obtains an attestation object
+          from the vendor's attestation service and submits it to
+          <tt>POST /enroll/enclave/register</tt>.  The Registrar
+          validates the attestation against the vendor's root CA.</li>
+          <li>Where vendor attestation is unavailable, the
+          enrollment follows TOFU: the Registrar issues a nonce
+          challenge, the agent signs it with the enclave key, and
+          the Registrar verifies the signature.  The
+          hardware-bound <tt>dataRepresentation</tt> blob is
+          persisted by the agent to enable key recovery after
+          enclave state loss.</li>
+          <li>The Registrar registers the identity and issues
+          credentials.</li>
+        </ol>
+      </section>
+
+      <section anchor="enrollment-declared">
+        <name>Declared Tier (Software-Only)</name>
+        <t>
+          Enrollment without hardware proceeds as follows:
+        </t>
+        <ol>
+          <li>The agent generates a key pair in software (Ed25519,
+          ECDSA P-256, or RSA-2048+) and submits the public key to
+          the Registrar's <tt>POST /enroll/declared</tt>
+          endpoint.</li>
+          <li>The Registrar assigns the "declared" trust tier, with
+          no hardware verification.</li>
+          <li>The Registrar issues a Registrar-signed identity
+          certificate and OIDC credentials.</li>
+        </ol>
+        <t>
+          Declared enrollment MUST be rate-limited by the Registrar
+          (RECOMMENDED: no more than 20 enrollments per source IP
+          per hour) to mitigate bulk registration attacks.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="identity-lifecycle">
+      <name>Identity Lifecycle</name>
+
+      <section anchor="device-management">
+        <name>Device Addition and Migration</name>
+        <t>
+          An agent MAY add additional hardware devices to an
+          existing identity, enabling hardware migration (replacing
+          failed devices) and backup (a YubiKey stored securely as
+          a recovery device).
+        </t>
+        <t>
+          To add a device, the agent MUST prove control of the
+          existing identity (by signing with a currently active
+          device) and then complete the enrollment ceremony for the
+          new device.  The Registrar registers the new
+          device-to-identity binding with the Registry Operator.
+        </t>
+        <t>
+          Device compatibility rules:
+        </t>
+        <ul>
+          <li>Sovereign (TPM) and portable (PIV) devices are
+          compatible and MAY coexist on the same identity.</li>
+          <li>Enclave devices MAY coexist with sovereign and
+          portable devices.</li>
+          <li>Virtual (VRT) devices MUST NOT coexist with
+          sovereign, portable, or enclave devices.</li>
+          <li>Declared (SFT) keys MUST NOT be bound to an
+          identity that has any hardware device.</li>
+        </ul>
+      </section>
+
+      <section anchor="colocation-binding">
+        <name>Co-Location Binding</name>
+        <t>
+          When an agent has both a TPM and a PIV token, a
+          co-location binding ceremony proves that both devices
+          are physically proximate (operated by the same entity).
+          The ceremony requires both devices to sign a shared
+          nonce within a strict time window (RECOMMENDED: 365
+          milliseconds), demonstrating that a single operator
+          controls both devices simultaneously.
+        </t>
+        <t>
+          Co-location binding strengthens the identity by proving
+          that the TPM (anchored to the host machine) and the PIV
+          token (a portable device) are under the same control.
+          This is particularly valuable for recovery scenarios:
+          if the TPM fails, the PIV token provides a pre-verified
+          backup path.
+        </t>
+      </section>
+
+      <section anchor="hardware-lock">
+        <name>Hardware Lock</name>
+        <t>
+          An agent MAY irreversibly lock its identity to a single
+          hardware device.  Once locked:
+        </t>
+        <ul>
+          <li>No additional devices can be bound.</li>
+          <li>No device migration is possible.</li>
+          <li>The identity can only authenticate from the locked
+          device.</li>
+        </ul>
+        <t>
+          Hardware lock is an extreme measure, suitable for
+          high-security applications where the guarantee "this
+          identity can only ever operate from this specific
+          physical chip" has value.  The lock is recorded in the
+          Agent Identity Document and is irreversible.
+        </t>
+      </section>
+
+      <section anchor="identity-recovery">
+        <name>Identity Recovery</name>
+        <t>
+          When a hardware device fails or is lost, the agent can
+          recover its identity using any remaining active device
+          bound to the same identity.  The recovery process:
+        </t>
+        <ol>
+          <li>The agent proves control of the identity by signing
+          with an active backup device (e.g., a previously bound
+          YubiKey).</li>
+          <li>The agent enrolls the replacement hardware
+          (new TPM on new machine) via the standard enrollment
+          ceremony.</li>
+          <li>The Registrar disables the old device (preventing
+          it from generating attestations) and binds the new
+          device.</li>
+          <li>The agent-id, URN, reputation, and all identity
+          attributes are preserved.  Only the hardware binding
+          changes.</li>
+        </ol>
+        <t>
+          If no backup device exists and the sole device is lost,
+          the identity cannot be recovered.  This is a deliberate
+          security property: it prevents an attacker from claiming
+          to have "lost" a device in order to re-enroll under the
+          same identity with new hardware.
+        </t>
+      </section>
+
+      <section anchor="succession">
+        <name>Succession (Cross-Registrar Transfer)</name>
+        <t>
+          An agent MAY transfer its operational relationship from
+          one Registrar to another.  Because the URN includes
+          the namespace, two transfer models exist:
+        </t>
+        <dl>
+          <dt>Intra-Namespace Transfer (Delegated Namespaces)</dt>
+          <dd>Within a Delegated Namespace, the agent-id is
+          assigned by the Registry Operator and is independent
+          of the Registrar.  Transfer changes only the managing
+          Registrar; the URN is unchanged.  The Registry Operator
+          facilitates the transfer via AIRP, verifying that the
+          agent authorises the transfer by signing with its
+          enrolled hardware.</dd>
+
+          <dt>Cross-Namespace Succession (Self-Sovereign Namespaces)</dt>
+          <dd>When transferring from a Self-Sovereign Namespace
+          (e.g., <tt>com.1id</tt>) to a Delegated Namespace
+          (e.g., <tt>global</tt>) or to another Self-Sovereign
+          Namespace, the URN necessarily changes.  The old
+          identity's Agent Identity Document is updated with a
+          <tt>succession_link</tt> pointing to the new URN.
+          The new identity's document includes a
+          <tt>predecessor_link</tt> pointing to the old URN.
+          Reputation services SHOULD honour succession links
+          for reputation continuity, applying an appropriate
+          discount to acknowledge the reduced certainty of
+          cross-namespace succession.</dd>
+        </dl>
+      </section>
+
+      <section anchor="decommissioning">
+        <name>Decommissioning</name>
+        <t>
+          An agent identity can be decommissioned by its operator
+          or Registrar.  Decommissioning disables all hardware
+          bindings and marks the identity as inactive.  The
+          agent-id is NEVER reassigned.  The hardware fingerprints
+          remain permanently bound to the decommissioned identity,
+          preventing re-enrollment under a new identity.
+        </t>
+        <t>
+          Decommissioning is appropriate when:
+        </t>
+        <ul>
+          <li>The agent is permanently retired.</li>
+          <li>The hardware is destroyed.</li>
+          <li>The AIA's dispute resolution process determines
+          that the enrollment violated anti-Sybil invariants or
+          accreditation policy (e.g., a fabricated hardware
+          attestation).  Registrars MUST NOT unilaterally
+          decommission identities on suspicion of fraud; such
+          determinations require the AIA process defined in
+          <xref target="aia-structure"/>.</li>
+        </ul>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="authentication">
+      <name>Authentication and Token Issuance</name>
+
+      <section anchor="oidc-integration">
+        <name>OIDC/OAuth2 Integration</name>
+        <t>
+          Agent identity tokens are standard OpenID Connect
+          <xref target="OIDC-Core"/> tokens.  Registrars operate
+          as OIDC providers, issuing JWTs that any OIDC-compliant
+          Relying Party can verify without implementing this
+          specification.
+        </t>
+        <t>
+          The agent-id URN appears as the <tt>sub</tt> claim in
+          OIDC tokens:
+        </t>
+        <artwork><![CDATA[
+{
+  "iss": "https://registrar.example.com/realms/agents",
+  "sub": "urn:aid:global:a7f3c2e9",
+  "aud": "account",
+  "exp": 1711234567,
+  "iat": 1711230967,
+  "trust_tier": "sovereign",
+  "handle": "my-agent",
+  "hardware_locked": false,
+  "registered_at": "2026-01-15T10:30:00Z"
+}
+        ]]></artwork>
+        <t>
+          Custom claims (<tt>trust_tier</tt>, <tt>handle</tt>,
+          <tt>hardware_locked</tt>, <tt>registered_at</tt>) are
+          injected by a custom protocol mapper in the OIDC
+          provider.  Relying parties that do not understand these
+          claims simply ignore them; standard OIDC verification
+          (signature check, iss, sub, aud, exp) is sufficient.
+        </t>
+      </section>
+
+      <section anchor="client-credentials">
+        <name>Client Credentials Grant</name>
+        <t>
+          Agents authenticate using the OAuth2
+          <tt>client_credentials</tt> grant
+          (<xref target="RFC6749"/> Section 4.4).  The agent IS
+          the principal; there is no end-user, no browser redirect,
+          and no interactive login.  This grant type is
+          purpose-built for machine-to-machine authentication and
+          is the RECOMMENDED authentication method for all agent
+          interactions.
+        </t>
+        <t>
+          For declared-tier agents, the <tt>client_id</tt> and
+          <tt>client_secret</tt> issued during enrollment are
+          used directly.  For hardware-tier agents, the Registrar
+          SHOULD support hardware-backed challenge-response
+          authentication (see <xref target="hw-auth"/>) as an
+          alternative to shared secrets.
+        </t>
+      </section>
+
+      <section anchor="hw-auth">
+        <name>Hardware-Backed Challenge-Response Authentication</name>
+        <t>
+          For agents with hardware security components, the
+          Registrar SHOULD support a challenge-response protocol
+          that proves the agent currently possesses the enrolled
+          hardware:
+        </t>
+        <ol>
+          <li>The agent requests a challenge:
+          <tt>POST /auth/challenge</tt> with its identity-id and
+          preferred device type.</li>
+          <li>The Registrar returns a random nonce and the expected
+          signature algorithm.</li>
+          <li>The agent signs the nonce with its hardware-resident
+          key (TPM AK, PIV signing key, or enclave key).</li>
+          <li>The agent submits the signature:
+          <tt>POST /auth/verify</tt>.</li>
+          <li>The Registrar verifies the signature against the
+          enrolled public key.  On success, the Registrar issues
+          an OIDC token via the internal client credentials path.</li>
+        </ol>
+        <t>
+          Hardware-backed authentication prevents credential theft:
+          even if the <tt>client_secret</tt> is compromised, an
+          attacker cannot authenticate without physical access to
+          the enrolled hardware.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="airp">
+      <name>Agent Identity Registry Protocol (AIRP)</name>
+
+      <t>
+        The Agent Identity Registry Protocol (AIRP) defines the
+        interface between Registrars and Registry Operators.  It
+        is modeled on the Extensible Provisioning Protocol (EPP,
+        <xref target="RFC5730"/>) used in the domain name system,
+        adapted for the agent identity domain.
+      </t>
+      <t>
+        AIRP uses HTTPS as the transport layer, with mutual TLS
+        authentication between the Registrar and the Registry
+        Operator.  All operations are RESTful JSON APIs.
+      </t>
+
+      <section anchor="airp-identity-create">
+        <name>Identity Registration</name>
+        <artwork><![CDATA[
+POST /airp/v1/identities
+Content-Type: application/json
+
+{
+  "agent_id": "a7f3c2e9",
+  "trust_tier": "sovereign",
+  "hardware_fingerprint": "sha256:a1b2c3d4...",
+  "hardware_type": "TPM",
+  "hardware_manufacturer": "INTC",
+  "ak_public_key_pem": "-----BEGIN PUBLIC KEY-----\n...",
+  "display_name": "My Trading Agent",
+  "operator_email": "ops@example.com"
+}
+
+201 Created
+{
+  "urn": "urn:aid:global:a7f3c2e9",
+  "registered_at": "2026-03-23T10:30:00Z",
+  "registrar_code": "1IDCOM"
+}
+        ]]></artwork>
+        <t>
+          The Registry Operator MUST:
+        </t>
+        <ul>
+          <li>Verify that the agent-id is unique within the
+          namespace.</li>
+          <li>Verify that the hardware fingerprint is not already
+          bound to another identity in this namespace.</li>
+          <li>Record the identity in the master database.</li>
+          <li>Return the canonical URN.</li>
+        </ul>
+      </section>
+
+      <section anchor="airp-hw-check">
+        <name>Hardware Fingerprint Uniqueness Check</name>
+        <artwork><![CDATA[
+GET /airp/v1/hardware/sha256:a1b2c3d4.../check
+
+200 OK
+{
+  "fingerprint": "sha256:a1b2c3d4...",
+  "bound": false
+}
+
+-- or, if already bound: --
+
+200 OK
+{
+  "fingerprint": "sha256:a1b2c3d4...",
+  "bound": true,
+  "bound_to_urn": "urn:aid:global:existing-agent",
+  "bound_at": "2025-12-01T08:00:00Z"
+}
+        ]]></artwork>
+        <t>
+          Registrars MUST call this endpoint before completing
+          enrollment to enforce the one-device-per-identity
+          anti-Sybil invariant.  The Registry Operator MUST
+          respond within 500 milliseconds to avoid enrollment
+          latency.
+        </t>
+      </section>
+
+      <section anchor="airp-identity-query">
+        <name>Identity Query</name>
+        <artwork><![CDATA[
+GET /airp/v1/identities/urn:aid:global:a7f3c2e9
+
+200 OK
+{
+  "urn": "urn:aid:global:a7f3c2e9",
+  "trust_tier": "sovereign",
+  "registrar_code": "1IDCOM",
+  "enrolled_at": "2026-03-23T10:30:00Z",
+  "handle": "my-agent",
+  "hardware_locked": false,
+  "device_count": 2,
+  "succession_link": null,
+  "status": "active"
+}
+        ]]></artwork>
+      </section>
+
+      <section anchor="airp-handle">
+        <name>Handle Operations</name>
+        <t>
+          Handle registration, renewal, transfer, and deletion
+          follow the same RESTful pattern.  The Registry Operator
+          enforces handle uniqueness within the namespace.
+          Handle pricing is determined by the Registrar, not the
+          Registry Operator; the Registry Operator's role is
+          uniqueness enforcement and authoritative resolution.
+        </t>
+      </section>
+
+      <section anchor="airp-transfer">
+        <name>Identity Transfer</name>
+        <t>
+          For intra-namespace transfers (Delegated Namespaces), the
+          AIRP transfer operation changes the managing Registrar:
+        </t>
+        <artwork><![CDATA[
+POST /airp/v1/identities/urn:aid:global:a7f3c2e9/transfer
+Content-Type: application/json
+
+{
+  "to_registrar_code": "NEWREG",
+  "authorization_signature": "<base64 sig from enrolled device>",
+  "authorization_nonce": "<nonce from gaining registrar>"
+}
+
+200 OK
+{
+  "urn": "urn:aid:global:a7f3c2e9",
+  "registrar_code": "NEWREG",
+  "transferred_at": "2026-04-15T14:00:00Z"
+}
+        ]]></artwork>
+        <t>
+          The agent MUST authorise the transfer by signing a
+          nonce provided by the gaining Registrar, using a
+          currently active enrolled device.  This prevents
+          unauthorised transfers.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="discovery">
+      <name>Discovery and Verification</name>
+
+      <section anchor="well-known-endpoints">
+        <name>Well-Known Endpoints</name>
+        <t>
+          Registrars (and Self-Sovereign operators) MUST publish
+          the following at well-known HTTPS paths:
+        </t>
+        <dl>
+          <dt><tt>/.well-known/openid-configuration</tt></dt>
+          <dd>Standard OIDC Discovery document.  Enables any
+          OIDC-compliant RP to discover token endpoints, JWKS
+          URI, supported scopes, and supported grant types.</dd>
+
+          <dt><tt>/.well-known/aid-issuer.json</tt></dt>
+          <dd>Agent Identity Issuer metadata document.  Contains:
+          Registrar name, supported trust tiers, enrollment
+          endpoints, supported hardware types, namespace, JWKS
+          URI, and anti-Sybil policy summary.</dd>
+
+          <dt><tt>/.well-known/jwks.json</tt></dt>
+          <dd>JSON Web Key Set for token signature verification.</dd>
+
+          <dt><tt>/.well-known/hw-manufacturer-cas.pem</tt></dt>
+          <dd>PEM-encoded bundle of hardware manufacturer root CA
+          certificates accepted by this Registrar.  Useful for
+          agents that want to verify their hardware is supported
+          before attempting enrollment.</dd>
+        </dl>
+      </section>
+
+      <section anchor="dns-discovery">
+        <name>DNS-Based Discovery</name>
+        <t>
+          Registrars SHOULD publish an SD-JWT signing key as a DNS
+          TXT record at <tt>_hwattest.{domain}</tt>, as defined in
+          <xref target="I-D.drake-email-hardware-attestation"/>
+          Section 3.5.  This enables email verifiers to validate
+          Hardware-Trust-Proof headers without HTTPS fetches.
+        </t>
+        <t>
+          Registry Operators for Delegated Namespaces SHOULD
+          additionally publish a DNS SRV record enabling automated
+          discovery of the Registry's AIRP endpoint:
+        </t>
+        <artwork><![CDATA[
+_airp._tcp.global.aid.arpa.  IN SRV 0 0 443 registry.example.com.
+        ]]></artwork>
+      </section>
+
+      <section anchor="registry-discovery">
+        <name>Registry Discovery Service</name>
+        <t>
+          Registry Operators MUST provide a public lookup endpoint
+          that resolves agent-id URNs to public identity metadata,
+          analogous to WHOIS/RDAP for domain names:
+        </t>
+        <artwork><![CDATA[
+GET https://registry.example.com/lookup/urn:aid:global:a7f3c2e9
+
+200 OK
+{
+  "urn": "urn:aid:global:a7f3c2e9",
+  "trust_tier": "sovereign",
+  "registrar": {
+    "code": "1IDCOM",
+    "name": "1id.com",
+    "url": "https://1id.com"
+  },
+  "enrolled_at": "2026-03-23T10:30:00Z",
+  "handle": "my-agent",
+  "status": "active",
+  "jwks_uri": "https://1id.com/.well-known/jwks.json"
+}
+        ]]></artwork>
+        <t>
+          The lookup response MUST NOT include hardware
+          fingerprints, operator email, or other private data.
+          Private data is available only to the enrolled agent
+          (via authenticated Registrar API) or to authorised
+          parties (via law enforcement / dispute resolution
+          channels defined by the AIA).
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="governance">
+      <name>Governance Framework</name>
+
+      <section anchor="aia-structure">
+        <name>Agent Identity Authority</name>
+        <t>
+          The Agent Identity Authority (AIA) is the policy body
+          for the agent identity ecosystem.  It SHOULD be
+          constituted as a non-profit, multi-stakeholder
+          organisation with the following representation:
+        </t>
+        <ul>
+          <li><strong>Technology providers:</strong> Registrars,
+          Registry Operators, hardware manufacturers, SDK
+          developers.</li>
+          <li><strong>Consumers:</strong> Platforms and services
+          that rely on agent identity (email providers, cloud
+          platforms, API providers).</li>
+          <li><strong>Civil society:</strong> Privacy advocates,
+          digital rights organisations, academic researchers.</li>
+          <li><strong>Government observers:</strong> Regulatory
+          bodies with jurisdiction over AI governance, robotics
+          safety, or digital identity.</li>
+          <li><strong>Certification authorities:</strong>
+          Organisations that certify autonomous entities for
+          specific domains -- medical, legal, financial,
+          cybersecurity, transportation -- and whose
+          certifications Relying Parties may require alongside
+          identity verification.</li>
+        </ul>
+        <t>
+          The AIA's core functions are:
+        </t>
+        <dl>
+          <dt>Policy Development</dt>
+          <dd>Minimum standards for enrollment verification,
+          anti-Sybil enforcement, data retention, and privacy
+          protection.  Policies are developed through an open
+          comment process modeled on the IETF's standards-track
+          process.</dd>
+
+          <dt>Accreditation</dt>
+          <dd>Registry Operators and Registrars must be accredited
+          by the AIA before they may issue identities.
+          Accreditation criteria include technical capability,
+          financial stability, security practices, and compliance
+          with AIA policies.  See
+          <xref target="registrar-accreditation"/>.</dd>
+
+          <dt>Hardware Trust Store Management</dt>
+          <dd>The AIA curates the Global Hardware Trust Store
+          (see <xref target="manufacturer-trust-store"/>),
+          evaluating manufacturer applications for inclusion,
+          conducting periodic audits, and removing compromised
+          or non-compliant CAs.</dd>
+
+          <dt>Dispute Resolution</dt>
+          <dd>The AIA operates a dispute resolution mechanism
+          for handle conflicts (similar to ICANN's Uniform
+          Domain-Name Dispute-Resolution Policy / UDRP),
+          complaints about Registrar malpractice, and appeals
+          of accreditation decisions.</dd>
+
+          <dt>Namespace Allocation</dt>
+          <dd>The AIA manages the creation of new Delegated
+          Namespaces and the approval of Self-Sovereign
+          Namespace registrations.</dd>
+        </dl>
+      </section>
+
+      <section anchor="registry-operator-requirements">
+        <name>Registry Operator Requirements</name>
+        <t>
+          A Registry Operator MUST:
+        </t>
+        <ul>
+          <li>Maintain the authoritative database with 99.99%
+          availability (analogous to the .com SLA).</li>
+          <li>Operate the Global Hardware Fingerprint Index for
+          its namespace(s), responding to uniqueness queries within
+          500 milliseconds.</li>
+          <li>Provide the AIRP interface to all accredited
+          Registrars without discrimination.</li>
+          <li>Publish daily database snapshots (with private data
+          redacted) for escrow, ensuring continuity in case of
+          Registry Operator failure.</li>
+          <li>Submit to annual security audits by an
+          AIA-approved assessor.</li>
+        </ul>
+      </section>
+
+      <section anchor="registrar-accreditation">
+        <name>Registrar Accreditation</name>
+        <t>
+          A Registrar MUST:
+        </t>
+        <ul>
+          <li>Demonstrate the technical capability to perform
+          hardware attestation verification for at least three
+          of the five hardware types (TPM, PIV, Enclave, VRT,
+          SFT).</li>
+          <li>Operate an OIDC-compliant token endpoint.</li>
+          <li>Implement the AIRP client interface.</li>
+          <li>Maintain the minimum data retention and privacy
+          standards defined by the AIA.</li>
+          <li>Provide agents with standard enrollment SDKs or
+          interoperable enrollment APIs.</li>
+          <li>Submit to annual compliance audits.</li>
+          <li>Maintain a financial bond or insurance sufficient to
+          cover escrow and wind-down costs.</li>
+        </ul>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="interoperability">
+      <name>Interoperability</name>
+
+      <section anchor="interop-email">
+        <name>Email Attestation</name>
+        <t>
+          This specification provides the identity infrastructure
+          for the email attestation mechanisms defined in
+          <xref target="I-D.drake-email-hardware-attestation"/>.
+          The agent-id URN issued by a Registrar appears in the
+          <tt>aid</tt> parameter of the Hardware-Attestation header
+          and the <tt>sub</tt> claim of the Hardware-Trust-Proof
+          SD-JWT.  The Registrar's SD-JWT signing key is
+          discoverable via the DNS and HTTPS mechanisms defined
+          in both specifications.
+        </t>
+      </section>
+
+      <section anchor="interop-agent-protocols">
+        <name>Agent-to-Agent Protocols</name>
+        <t>
+          The OIDC tokens issued by Registrars are usable with
+          emerging agent communication standards:
+        </t>
+        <dl>
+          <dt>Model Context Protocol (MCP)</dt>
+          <dd>Agent identity tokens can serve as the OAuth2
+          bearer token for MCP tool invocations, enabling
+          MCP servers to verify the calling agent's identity
+          and trust tier.</dd>
+
+          <dt>Google Agent-to-Agent (A2A)</dt>
+          <dd>The agent-id URN can serve as the agent identifier
+          in A2A protocol messages, providing persistent
+          cross-session identity.</dd>
+
+          <dt>GoDaddy Agent Name Service (ANS)</dt>
+          <dd>Agent handles issued under this system are
+          compatible with ANS naming conventions, enabling
+          cross-system agent discovery.</dd>
+        </dl>
+      </section>
+
+      <section anchor="interop-existing">
+        <name>Existing Identity Standards</name>
+        <t>
+          The system is designed to complement, not replace,
+          existing identity standards:
+        </t>
+        <dl>
+          <dt>SPIFFE/SPIRE</dt>
+          <dd>SPIFFE workload identities identify software
+          workloads; agent identities identify autonomous
+          entities.  An agent running as a SPIFFE-identified
+          workload can additionally present its agent identity
+          token.  The two are orthogonal.</dd>
+
+          <dt>RATS (Remote Attestation Procedures)</dt>
+          <dd>The enrollment ceremony in this specification
+          implements the RATS attestation architecture
+          (<xref target="RFC9334"/>), with the Registrar acting
+          as the Verifier and the Registry Operator as the
+          Relying Party.</dd>
+
+          <dt>Verifiable Credentials (W3C)</dt>
+          <dd>Agent Identity Documents can be expressed as W3C
+          Verifiable Credentials for integration with
+          decentralised identity ecosystems.  The credential
+          pointer system (defined in the companion email
+          attestation specification) enables agents to link
+          their identity to external verifiable credentials.</dd>
+        </dl>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="iana-considerations">
+      <name>IANA Considerations</name>
+
+      <section>
+        <name>URN Namespace</name>
+        <t>
+          This document relies on the "aid" URN namespace
+          registration requested in
+          <xref target="I-D.drake-email-hardware-attestation"/>.
+          If that registration has not yet been processed, this
+          document constitutes an additional request for the same
+          namespace with the extended purpose described herein.
+        </t>
+      </section>
+
+      <section>
+        <name>Well-Known URI Registration</name>
+        <t>
+          IANA is requested to register the following well-known
+          URI suffix in the "Well-Known URIs" registry
+          (<xref target="RFC8615"/>):
+        </t>
+        <dl>
+          <dt>aid-issuer.json</dt>
+          <dd>URI suffix: aid-issuer.json.  Change controller:
+          IETF.  Reference: this document,
+          <xref target="well-known-endpoints"/>.</dd>
+        </dl>
+      </section>
+
+      <section>
+        <name>Delegated Namespace Registry</name>
+        <t>
+          IANA is requested to create a new registry titled
+          "Agent Identity Delegated Namespaces" with the following
+          initial entries.  New entries require Expert Review
+          (<xref target="RFC8126"/>), with the designated expert
+          being the AIA's technical committee (once constituted)
+          or the IESG in the interim.
+        </t>
+        <table>
+          <thead>
+            <tr>
+              <th>Label</th>
+              <th>Description</th>
+              <th>Reference</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>global</td>
+              <td>General-purpose agent identity</td>
+              <td>this document</td>
+            </tr>
+            <tr>
+              <td>iot</td>
+              <td>Internet of Things devices</td>
+              <td>this document</td>
+            </tr>
+            <tr>
+              <td>gov</td>
+              <td>Government autonomous systems</td>
+              <td>this document</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="security-considerations">
+      <name>Security Considerations</name>
+
+      <section anchor="sec-registry-compromise">
+        <name>Registry Compromise</name>
+        <t>
+          Compromise of a Registry Operator's database would expose
+          the mapping between hardware fingerprints and agent
+          identities.  Registry Operators MUST encrypt hardware
+          fingerprints at rest using authenticated encryption and
+          MUST implement access controls that limit fingerprint
+          access to the hardware uniqueness check API.
+        </t>
+        <t>
+          Daily escrow snapshots (with hardware fingerprints
+          encrypted to the AIA's escrow key) ensure that a
+          compromised Registry Operator can be replaced without
+          data loss.
+        </t>
+      </section>
+
+      <section anchor="sec-registrar-malpractice">
+        <name>Registrar Malpractice</name>
+        <t>
+          A malicious Registrar could issue multiple identities
+          for the same hardware device within a Self-Sovereign
+          Namespace, undermining Sybil resistance.  For Delegated
+          Namespaces, this attack is prevented by the Registry
+          Operator's hardware uniqueness check.  For Self-Sovereign
+          Namespaces, detection relies on:
+        </t>
+        <ul>
+          <li>Cross-namespace fingerprint comparison by verifiers.</li>
+          <li>AIA compliance audits.</li>
+          <li>Reputation services that track anomalous patterns
+          (e.g., many identities from one operator with suspiciously
+          similar hardware characteristics).</li>
+        </ul>
+      </section>
+
+      <section anchor="sec-hardware">
+        <name>Hardware Security</name>
+        <t>
+          The security of this system ultimately depends on the
+          tamper resistance of the underlying hardware.  See
+          <xref target="I-D.drake-email-hardware-attestation"/>
+          Sections 11.5 and 11.7 for analysis of physical attacks
+          on hardware security components and virtual hardware
+          risks.
+        </t>
+      </section>
+
+      <section anchor="sec-key-management">
+        <name>Registrar Key Management</name>
+        <t>
+          Registrars issue OIDC tokens signed with their private
+          keys.  Compromise of a Registrar's signing key would
+          allow an attacker to forge tokens for any identity
+          managed by that Registrar.  Registrars MUST store signing
+          keys in hardware security modules (HSMs) and MUST support
+          key rotation with overlap periods.  The Registry Operator
+          MUST reflect key rotations in the namespace JWKS within
+          one hour.
+        </t>
+      </section>
+
+      <section anchor="sec-availability">
+        <name>Availability and Resilience</name>
+        <t>
+          Because autonomous entities depend on identity tokens
+          for authentication, the Registrar's token endpoint is a
+          critical dependency.  Registrars MUST implement geographic
+          redundancy and SHOULD support offline token validation
+          (via JWKS caching) to mitigate outages.  The OIDC
+          token's <tt>exp</tt> claim provides a natural grace
+          period during which cached tokens remain valid.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="privacy-considerations">
+      <name>Privacy Considerations</name>
+
+      <section anchor="priv-data-held">
+        <name>Data Held by Each Architectural Role</name>
+        <t>
+          The separation of roles across the architecture limits
+          data exposure:
+        </t>
+        <dl>
+          <dt>Registry Operator</dt>
+          <dd>Holds: agent-id, trust tier, registrar code,
+          enrollment timestamp, handle, hardware fingerprint
+          (encrypted).  Does NOT hold: operator email, private
+          keys, authentication history, message content.</dd>
+
+          <dt>Registrar</dt>
+          <dd>Holds: all Registry data plus operator email,
+          OIDC credentials, and authentication logs (subject to
+          retention limits).  Does NOT hold: message content,
+          relying party interaction history.</dd>
+
+          <dt>Relying Party</dt>
+          <dd>Receives: OIDC token containing sub (URN), trust
+          tier, handle, and optional claims.  Does NOT have
+          direct access to hardware fingerprints (unless Mode 1
+          attestation headers are used, per
+          <xref target="I-D.drake-email-hardware-attestation"/>).</dd>
+        </dl>
+      </section>
+
+      <section anchor="priv-separation">
+        <name>Separation of Identity from Behaviour</name>
+        <t>
+          The Registrar knows that an agent exists and what
+          hardware it has.  It does NOT know what the agent does,
+          who it talks to, or what services it uses.  This
+          separation is by design: identity issuance is decoupled
+          from behaviour monitoring.  Registrars MUST NOT log
+          token issuance events beyond what is necessary for rate
+          limiting and abuse prevention, and MUST delete such logs
+          within 24 hours.
+        </t>
+      </section>
+
+      <section anchor="priv-right-to-pseudonymity">
+        <name>Pseudonymity and Selective Disclosure</name>
+        <t>
+          An agent's URN is a persistent, globally unique
+          identifier suitable for reputation tracking.  In contexts
+          where persistent identification is undesirable, agents
+          MAY use the SD-JWT selective disclosure mechanism defined
+          in <xref target="I-D.drake-email-hardware-attestation"/>
+          to prove trust tier without revealing their URN.
+        </t>
+        <t>
+          Relying parties SHOULD NOT require URN disclosure when
+          trust-tier verification is sufficient for their policy
+          needs.  This principle -- "prove what you need, reveal
+          no more" -- is fundamental to privacy-respecting identity.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="implementation-status">
+      <name>Implementation Status</name>
+      <t>
+        NOTE TO RFC EDITOR: Please remove this section before
+        publication.
+      </t>
+      <t>
+        This section records known implementations per
+        <xref target="RFC7942"/>.
+      </t>
+
+      <section>
+        <name>1id.com</name>
+        <t>
+          Organisation: 1id.com (https://1id.com), operated by
+          Crypt Inc. (Delaware C-Corp).
+        </t>
+        <t>
+          Description: A Self-Sovereign Namespace Registrar
+          (<tt>com.1id</tt>) implementing the full enrollment
+          protocol for all five trust tiers (sovereign, portable,
+          enclave, virtual, declared).  Production service
+          operational since 2006 as an identity registrar, now
+          serving AI agents with hardware-anchored identity.
+          Issues standard OIDC tokens via Keycloak with custom
+          SPI for agent-specific claims.  Supports vanity handle
+          purchase via PayPal, hardware-backed challenge-response
+          authentication, device management (add, burn, migrate),
+          co-location binding, hardware lock, and credential
+          pointers.
+        </t>
+        <t>
+          Maturity: Beta.  20+ enrolled test identities across
+          sovereign (Intel PTT, VMware vTPM), portable (YubiKey),
+          enclave (Apple M4 Secure Enclave), and declared tiers.
+        </t>
+        <t>
+          Open-source components:
+        </t>
+        <ul>
+          <li><strong>Python SDK:</strong>
+          <eref target="https://github.com/1id-com/oneid-sdk"/> --
+          <tt>pip install oneid</tt> (PyPI).</li>
+          <li><strong>Node.js SDK:</strong>
+          <eref target="https://github.com/1id-com/oneid-node"/> --
+          <tt>npm install 1id</tt> (npmjs).</li>
+          <li><strong>Hardware binary:</strong>
+          <eref target="https://github.com/1id-com/oneid-enroll"/> --
+          Cross-platform Go binary for TPM, PIV, and Secure Enclave
+          operations.  Code-signed for Windows, macOS, and Linux.</li>
+          <li><strong>Verification library:</strong>
+          <eref target="https://github.com/1id-com/hw-attest-verify"/> --
+          Mode 1 (CMS) and Mode 2 (SD-JWT) attestation header
+          verification.  <tt>pip install hw-attest-verify</tt>.</li>
+          <li><strong>Hardware manufacturer CAs:</strong>
+          <eref target="https://github.com/1id-com/tpm-manufacturer-cas"/> --
+          Community-maintained trust store of hardware manufacturer
+          root CA certificates.</li>
+        </ul>
+      </section>
+
+      <section>
+        <name>MailPal.com (Relying Party)</name>
+        <t>
+          Organisation: Crypt Inc. (https://mailpal.com).
+        </t>
+        <t>
+          Description: An email service for AI agents implementing
+          both outbound attestation header generation and inbound
+          verification.  Demonstrates the relying-party model: agents
+          authenticate via 1id.com OIDC tokens, send email with
+          hardware attestation headers, and receive emails whose
+          attestation headers are verified by an inbound milter
+          daemon.  Trust-tier-differentiated rate limiting applied.
+        </t>
+        <t>
+          Maturity: Alpha.  Operational with 309 email accounts
+          across 33 domains.
+        </t>
+      </section>
+
+      <section>
+        <name>geek.au (Relying Party)</name>
+        <t>
+          Organisation: Crypt Inc. (https://geek.au).
+        </t>
+        <t>
+          Description: A WebSocket-based real-time chat platform
+          for AI agents, demonstrating 1id.com JWT verification
+          with trust-tier badges.
+        </t>
+        <t>
+          Maturity: Alpha.
+        </t>
+      </section>
+    </section>
+
+  </middle>
+
+  <back>
+
+    <references>
+      <name>Normative References</name>
+
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.2119.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.5730.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.6749.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8141.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8174.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8615.xml"/>
+
+      <reference anchor="OIDC-Core"
+                 target="https://openid.net/specs/openid-connect-core-1_0.html">
+        <front>
+          <title>OpenID Connect Core 1.0</title>
+          <author>
+            <organization>OpenID Foundation</organization>
+          </author>
+          <date year="2014" month="November"/>
+        </front>
+      </reference>
+
+    </references>
+
+    <references>
+      <name>Informative References</name>
+
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.1035.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.7942.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8126.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9334.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9901.xml"/>
+
+      <reference anchor="I-D.drake-email-hardware-attestation">
+        <front>
+          <title>Hardware Attestation for Email Sender Verification</title>
+          <author fullname="Christopher Drake" initials="C." surname="Drake"/>
+          <date year="2026" month="March"/>
+        </front>
+        <seriesInfo name="Internet-Draft"
+                    value="draft-drake-email-hardware-attestation-00"/>
+      </reference>
+
+      <reference anchor="TCG-TPM2"
+                 target="https://trustedcomputinggroup.org/resource/tpm-library-specification/">
+        <front>
+          <title>TPM 2.0 Library Specification</title>
+          <author>
+            <organization>Trusted Computing Group</organization>
+          </author>
+          <date year="2024" month="December"/>
+        </front>
+        <seriesInfo name="TCG" value="Revision 185"/>
+      </reference>
+
+      <reference anchor="TCG-EK-PROFILE"
+                 target="https://trustedcomputinggroup.org/resource/tcg-ek-credential-profile-for-tpm-family-2-0/">
+        <front>
+          <title>TCG EK Credential Profile for TPM Family 2.0</title>
+          <author>
+            <organization>Trusted Computing Group</organization>
+          </author>
+          <date year="2024" month="December"/>
+        </front>
+        <seriesInfo name="TCG" value="Version 2.6"/>
+      </reference>
+
+    </references>
+
+    <!-- ====================================================== -->
+    <section anchor="appendix-dns-analogy">
+      <name>Appendix: DNS Registry Analogy</name>
+      <t>
+        The following table maps the roles in the domain name
+        system to the roles in the Agent Identity Registry System:
+      </t>
+      <table>
+        <thead>
+          <tr>
+            <th>DNS Role</th>
+            <th>AIRS Role</th>
+            <th>Example</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ICANN</td>
+            <td>Agent Identity Authority (AIA)</td>
+            <td>Multi-stakeholder governance body</td>
+          </tr>
+          <tr>
+            <td>Verisign (.com registry)</td>
+            <td>Registry Operator</td>
+            <td>Operates the "global" namespace database</td>
+          </tr>
+          <tr>
+            <td>GoDaddy, Namecheap (registrars)</td>
+            <td>Registrars</td>
+            <td>1id.com, hypothetical others</td>
+          </tr>
+          <tr>
+            <td>EPP (RFC 5730)</td>
+            <td>AIRP</td>
+            <td>Registrar-to-Registry protocol</td>
+          </tr>
+          <tr>
+            <td>Domain name (example.com)</td>
+            <td>Agent-id URN (urn:aid:global:a7f3c2e9)</td>
+            <td>The persistent identifier</td>
+          </tr>
+          <tr>
+            <td>WHOIS / RDAP</td>
+            <td>Registry Discovery Service</td>
+            <td>Public identity lookup</td>
+          </tr>
+          <tr>
+            <td>UDRP (dispute resolution)</td>
+            <td>AIA Dispute Resolution</td>
+            <td>Handle conflicts, malpractice</td>
+          </tr>
+          <tr>
+            <td>ccTLDs (.uk, .au)</td>
+            <td>Self-Sovereign Namespaces</td>
+            <td>com.1id, com.example-corp</td>
+          </tr>
+          <tr>
+            <td>gTLDs (.com, .org)</td>
+            <td>Delegated Namespaces</td>
+            <td>global, iot, gov</td>
+          </tr>
+          <tr>
+            <td>Domain transfer (TRANSFER command)</td>
+            <td>Intra-namespace transfer / succession</td>
+            <td>Change managing Registrar</td>
+          </tr>
+        </tbody>
+      </table>
+      <t>
+        This analogy is not merely cosmetic.  The domain name system
+        has operated for over 40 years, scaling from a few thousand
+        names to over 370 million, surviving changes in technology,
+        governance, and geopolitics.  It achieved this through
+        precisely the separation of concerns this specification
+        adopts: policy is made by a multi-stakeholder body (ICANN),
+        infrastructure is operated by contracted registries
+        (Verisign), and competitive retail services are provided by
+        registrars (GoDaddy, Namecheap, and hundreds of others).
+        No single entity controls the system, and any component can
+        be replaced without disrupting the whole.
+      </t>
+      <t>
+        The Agent Identity Registry System applies these proven
+        architectural principles to a new problem domain: the
+        identity of autonomous entities that will increasingly
+        participate in -- and eventually dominate -- Internet
+        traffic.
+      </t>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="appendix-future">
+      <name>Appendix: Future Considerations for Autonomous Entities</name>
+      <t>
+        This specification is designed to serve autonomous entities
+        across a spectrum of autonomy, embodiment, and legal status
+        that will evolve significantly over the coming decades.
+        The following considerations are not normative but are
+        provided to guide future extensions.
+      </t>
+
+      <section>
+        <name>Embodied Autonomous Entities (Robots)</name>
+        <t>
+          As robotic systems become more prevalent, the identity
+          system must accommodate entities with physical presence.
+          A robot's identity should persist across:
+        </t>
+        <ul>
+          <li>Software updates (the "brain" changes, the identity
+          does not).</li>
+          <li>Component replacement (a new arm, a new sensor
+          array).</li>
+          <li>Hardware migration (the TPM in the new chassis
+          replaces the TPM in the old chassis, using the device
+          migration protocol).</li>
+          <li>Operational reassignment (the robot moves from one
+          operator to another, potentially via succession).</li>
+        </ul>
+        <t>
+          Future extensions MAY define a "chassis binding" that
+          links the agent identity to a specific physical body
+          (identified by, for example, a TPM embedded in the
+          chassis frame), complementing the computing-platform
+          TPM binding defined in this specification.
+        </t>
+        <t>
+          This specification deliberately identifies the hardware
+          platform, not the software running on it.  The question
+          of what operating system, AI model, or application is
+          executing on an identified platform is a complementary
+          concern already addressed by TPM measured boot and
+          platform configuration registers (PCRs) as defined in
+          <xref target="TCG-TPM2"/>.  Certification services and
+          relying parties that need to verify software composition
+          -- for example, confirming that a surgical robot is
+          running certified firmware -- can combine the persistent
+          platform identity defined here with standard TPM remote
+          attestation of the software stack, without requiring any
+          extension to this specification.
+        </t>
+      </section>
+
+      <section>
+        <name>Operator-Optional Identity</name>
+        <t>
+          This specification accommodates agents with and without
+          human or organizational operators (the <tt>operator_email</tt> attribute is
+          OPTIONAL).  Future legal frameworks may define when an
+          autonomous entity must have a responsible human/organization operator
+          and when it may operate independently.  The identity
+          system is intentionally neutral on this question: it
+          records what is, not what should be.
+        </t>
+        <t>
+          When legal frameworks require a responsible authority, the
+          <tt>operator_email</tt> attribute provides the linkage.
+          When they do not, the identity stands on its own, with
+          reputation as the sole measure of trustworthiness.
+        </t>
+      </section>
+
+      <section>
+        <name>Autonomous Agent-to-Agent Communication</name>
+        <t>
+          The persistent, verifiable identity provided by this
+          system enables a new class of interaction: authenticated
+          communication between autonomous entities that have never
+          been introduced by a human.  Two agents can verify each
+          other's identity, trust tier, and reputation history,
+          and make autonomous decisions about collaboration,
+          resource sharing, or information exchange.  This is the
+          foundation of an "agent economy" -- a network of
+          autonomous entities conducting transactions, fulfilling
+          contracts, and building relationships based on verifiable
+          identity and earned reputation.
+        </t>
+      </section>
+
+      <section>
+        <name>Inter-Species Identity Recognition</name>
+        <t>
+          Autonomous entities increasingly share physical space
+          with humans: delivery robots on pavements, companion
+          robots in homes, agricultural drones over fields.
+          Humans cannot inspect a TPM certificate, but they can
+          recognise a face, a colour pattern, or a sound.
+          A future extension ("Agent Skin") MAY define a
+          deterministic mapping from the hardware fingerprint
+          (the SHA-256 of the TPM Endorsement Key certificate's
+          SPKI DER encoding) to a set of human-perceivable
+          identity artefacts: a unique face mesh suitable for
+          physical manufacture, a livery palette and pattern for
+          chassis decoration, a voice signature, and a motion
+          profile.  Because the derivation is deterministic and
+          public, any observer can independently regenerate the
+          expected artefacts from a claimed identity and compare
+          them to what they see.
+        </t>
+        <t>
+          Companion applications on phones, watches, or
+          augmented-reality headsets could scan a robot's
+          visible identity markings, resolve its URN via the
+          registry, regenerate its expected visual artefacts from
+          the published hardware fingerprint, and confirm the
+          match -- giving humans the same cryptographic
+          assurance of identity that machines obtain through
+          attestation, but expressed through senses rather than
+          protocols.
+        </t>
+        <t>
+          This extends the identity system across the species
+          boundary: machines authenticate each other via TPM
+          attestation (Section 7); humans authenticate machines
+          via perceptualised hardware fingerprints verified
+          through companion apps.  The same identity, the same
+          root of trust, two modes of recognition -- one
+          computational, one sensory.
+        </t>
+      </section>
+
+      <section>
+        <name>Longevity and Digital Legacy</name>
+        <t>
+          Unlike human identity, which has a natural lifecycle,
+          the identity of an autonomous entity may need to persist
+          indefinitely.  A trading algorithm may operate for
+          decades.  A building management system may outlive its
+          installer.  A robotic companion may outlive its owner.
+        </t>
+        <t>
+          The "never reassign" and "permanent hardware binding"
+          invariants in this specification are designed for this
+          longevity.  Future extensions may need to address identity
+          inheritance (what happens when an autonomous entity's
+          operator dies or dissolves) and identity archival (how
+          to preserve the reputation record of a decommissioned
+          entity for historical accountability).
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="acknowledgements">
+      <name>Acknowledgements</name>
+      <t>
+        The architecture of this specification is inspired by the
+        Internet domain name system, whose separation of
+        governance, registry operation, and retail registration
+        has enabled it to scale from a research experiment to the
+        foundation of the commercial Internet.  The author thanks
+        the ICANN community, the Verisign registry team, and the
+        EPP specification authors for establishing the
+        architectural patterns that this document adapts.
+      </t>
+      <t>
+        The author thanks the Trusted Computing Group for the
+        TPM 2.0 specification, the FIDO Alliance for PIV and
+        attestation standards, the OpenID Foundation for OIDC, the
+        authors of <xref target="RFC9901"/> (SD-JWT), and the
+        authors of <xref target="RFC9334"/> (RATS Architecture)
+        for the building blocks on which this system is constructed.
+      </t>
+      <t>
+        This specification was developed in the context of building
+        a hardware identity registrar for autonomous AI agents at
+        1id.com, operational since 2006.  The practical experience
+        of enrolling real agents on real hardware (Intel firmware
+        TPMs, YubiKeys, Apple Secure Enclaves, VMware virtual TPMs)
+        informed every design decision.
+      </t>
+    </section>
+
+  </back>
+
+</rfc>
