@@ -4,8 +4,8 @@
 
 Network Working Group                                           C. Drake
 Internet-Draft                                                   1id.com
-Intended status: Experimental                                14 May 2026
-Expires: 15 November 2026
+Intended status: Experimental                                23 May 2026
+Expires: 24 November 2026
 
 
  Agent Identity Registry System: A Federated Architecture for Hardware-
@@ -53,7 +53,7 @@ Abstract
 
 
 
-Drake                   Expires 15 November 2026                [Page 1]
+Drake                   Expires 24 November 2026                [Page 1]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -82,7 +82,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 15 November 2026.
+   This Internet-Draft will expire on 24 November 2026.
 
 Copyright Notice
 
@@ -109,7 +109,7 @@ Table of Contents
 
 
 
-Drake                   Expires 15 November 2026                [Page 2]
+Drake                   Expires 24 November 2026                [Page 2]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -165,7 +165,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026                [Page 3]
+Drake                   Expires 24 November 2026                [Page 3]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -221,7 +221,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026                [Page 4]
+Drake                   Expires 24 November 2026                [Page 4]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -277,7 +277,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026                [Page 5]
+Drake                   Expires 24 November 2026                [Page 5]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -333,7 +333,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026                [Page 6]
+Drake                   Expires 24 November 2026                [Page 6]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -389,7 +389,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026                [Page 7]
+Drake                   Expires 24 November 2026                [Page 7]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -445,7 +445,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026                [Page 8]
+Drake                   Expires 24 November 2026                [Page 8]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -501,7 +501,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026                [Page 9]
+Drake                   Expires 24 November 2026                [Page 9]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -557,7 +557,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 10]
+Drake                   Expires 24 November 2026               [Page 10]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -613,7 +613,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 11]
+Drake                   Expires 24 November 2026               [Page 11]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -669,7 +669,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 12]
+Drake                   Expires 24 November 2026               [Page 12]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -725,7 +725,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 13]
+Drake                   Expires 24 November 2026               [Page 13]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -781,7 +781,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 14]
+Drake                   Expires 24 November 2026               [Page 14]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -837,7 +837,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 15]
+Drake                   Expires 24 November 2026               [Page 15]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -864,10 +864,10 @@ Internet-Draft           Agent Identity Registry                May 2026
    identifier_ and at most one currently-active _handle_.  Both are
    valid agent-id values and both form valid URNs:
 
-urn:aid:global:id-9854187104        canonical, permanent
-urn:aid:global:crusty                handle, may be retired
-urn:aid:com.1id:id-3387412508       canonical, permanent
-urn:aid:com.1id:crusty              handle (different agent than global:crusty)
+   urn:aid:global:id-9854187104   canonical, permanent
+   urn:aid:global:crusty          handle, may be retired
+   urn:aid:com.1id:id-3387412508  canonical, permanent
+   urn:aid:com.1id:crusty         handle (scoped to com.1id)
 
    Both URN forms for the same agent resolve to the same Agent Identity
    Document and authenticate the same OIDC sub.  The canonical
@@ -893,7 +893,7 @@ urn:aid:com.1id:crusty              handle (different agent than global:crusty)
 
 
 
-Drake                   Expires 15 November 2026               [Page 16]
+Drake                   Expires 24 November 2026               [Page 16]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -949,7 +949,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 17]
+Drake                   Expires 24 November 2026               [Page 17]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1005,7 +1005,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 18]
+Drake                   Expires 24 November 2026               [Page 18]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1061,7 +1061,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 19]
+Drake                   Expires 24 November 2026               [Page 19]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1117,7 +1117,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 20]
+Drake                   Expires 24 November 2026               [Page 20]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1173,7 +1173,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 21]
+Drake                   Expires 24 November 2026               [Page 21]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1229,7 +1229,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 22]
+Drake                   Expires 24 November 2026               [Page 22]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1285,7 +1285,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 23]
+Drake                   Expires 24 November 2026               [Page 23]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1341,7 +1341,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 24]
+Drake                   Expires 24 November 2026               [Page 24]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1397,7 +1397,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 25]
+Drake                   Expires 24 November 2026               [Page 25]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1453,7 +1453,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 26]
+Drake                   Expires 24 November 2026               [Page 26]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1509,7 +1509,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 27]
+Drake                   Expires 24 November 2026               [Page 27]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1565,7 +1565,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 28]
+Drake                   Expires 24 November 2026               [Page 28]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1621,7 +1621,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 29]
+Drake                   Expires 24 November 2026               [Page 29]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1677,7 +1677,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 30]
+Drake                   Expires 24 November 2026               [Page 30]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1733,7 +1733,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 31]
+Drake                   Expires 24 November 2026               [Page 31]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1789,7 +1789,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 32]
+Drake                   Expires 24 November 2026               [Page 32]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1845,7 +1845,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 33]
+Drake                   Expires 24 November 2026               [Page 33]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1901,7 +1901,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 34]
+Drake                   Expires 24 November 2026               [Page 34]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1957,7 +1957,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 35]
+Drake                   Expires 24 November 2026               [Page 35]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2013,7 +2013,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 36]
+Drake                   Expires 24 November 2026               [Page 36]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2069,7 +2069,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 37]
+Drake                   Expires 24 November 2026               [Page 37]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2125,7 +2125,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 38]
+Drake                   Expires 24 November 2026               [Page 38]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2181,7 +2181,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 39]
+Drake                   Expires 24 November 2026               [Page 39]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2237,7 +2237,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 40]
+Drake                   Expires 24 November 2026               [Page 40]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2293,7 +2293,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 41]
+Drake                   Expires 24 November 2026               [Page 41]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2349,7 +2349,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 42]
+Drake                   Expires 24 November 2026               [Page 42]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2405,7 +2405,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 43]
+Drake                   Expires 24 November 2026               [Page 43]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2461,7 +2461,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 44]
+Drake                   Expires 24 November 2026               [Page 44]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2517,7 +2517,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 45]
+Drake                   Expires 24 November 2026               [Page 45]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2573,7 +2573,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 46]
+Drake                   Expires 24 November 2026               [Page 46]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2629,7 +2629,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 47]
+Drake                   Expires 24 November 2026               [Page 47]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2685,7 +2685,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 48]
+Drake                   Expires 24 November 2026               [Page 48]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2741,7 +2741,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 49]
+Drake                   Expires 24 November 2026               [Page 49]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2797,7 +2797,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 50]
+Drake                   Expires 24 November 2026               [Page 50]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2853,7 +2853,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 51]
+Drake                   Expires 24 November 2026               [Page 51]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2909,7 +2909,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 52]
+Drake                   Expires 24 November 2026               [Page 52]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2965,7 +2965,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 53]
+Drake                   Expires 24 November 2026               [Page 53]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3021,7 +3021,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 54]
+Drake                   Expires 24 November 2026               [Page 54]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3077,7 +3077,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 55]
+Drake                   Expires 24 November 2026               [Page 55]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3133,7 +3133,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 56]
+Drake                   Expires 24 November 2026               [Page 56]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3189,7 +3189,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 57]
+Drake                   Expires 24 November 2026               [Page 57]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3245,7 +3245,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 58]
+Drake                   Expires 24 November 2026               [Page 58]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3301,7 +3301,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 59]
+Drake                   Expires 24 November 2026               [Page 59]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3357,7 +3357,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 60]
+Drake                   Expires 24 November 2026               [Page 60]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3413,7 +3413,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 61]
+Drake                   Expires 24 November 2026               [Page 61]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3469,7 +3469,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 62]
+Drake                   Expires 24 November 2026               [Page 62]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3525,7 +3525,7 @@ Appendix A.  Appendix: DNS Registry Analogy
 
 
 
-Drake                   Expires 15 November 2026               [Page 63]
+Drake                   Expires 24 November 2026               [Page 63]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3581,7 +3581,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 64]
+Drake                   Expires 24 November 2026               [Page 64]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3637,7 +3637,7 @@ B.1.  Embodied Autonomous Entities (Robots)
 
 
 
-Drake                   Expires 15 November 2026               [Page 65]
+Drake                   Expires 24 November 2026               [Page 65]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3693,7 +3693,7 @@ B.4.  Inter-Species Identity Recognition
 
 
 
-Drake                   Expires 15 November 2026               [Page 66]
+Drake                   Expires 24 November 2026               [Page 66]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3749,7 +3749,7 @@ Appendix C.  Acknowledgements
 
 
 
-Drake                   Expires 15 November 2026               [Page 67]
+Drake                   Expires 24 November 2026               [Page 67]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3805,4 +3805,4 @@ Author's Address
 
 
 
-Drake                   Expires 15 November 2026               [Page 68]
+Drake                   Expires 24 November 2026               [Page 68]

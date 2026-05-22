@@ -25,7 +25,7 @@
       </address>
     </author>
 
-    <date year="2026" month="May" day="14"/>
+    <date year="2026" month="May" day="23"/>
 
     <area>Security</area>
     <workgroup/>
@@ -712,10 +712,10 @@ let-dig-hyp      = ALPHA / DIGIT / "-"
             agent-id values and both form valid URNs:
           </t>
           <artwork><![CDATA[
-urn:aid:global:id-9854187104        canonical, permanent
-urn:aid:global:crusty                handle, may be retired
-urn:aid:com.1id:id-3387412508       canonical, permanent
-urn:aid:com.1id:crusty              handle (different agent than global:crusty)
+urn:aid:global:id-9854187104   canonical, permanent
+urn:aid:global:crusty          handle, may be retired
+urn:aid:com.1id:id-3387412508  canonical, permanent
+urn:aid:com.1id:crusty         handle (scoped to com.1id)
           ]]></artwork>
           <t>
             Both URN forms for the same agent resolve to the same
@@ -3413,7 +3413,17 @@ GET https://registry.example.com/lookup/urn:aid:global:id-9854187104
       <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9421.xml"/>
       <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9449.xml"/>
       <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9530.xml"/>
-      <xi:include href="bibxml/reference.RFC.9846.xml"/>
+      <reference anchor="RFC9846" target="https://www.rfc-editor.org/info/rfc9846">
+        <front>
+          <title>The Transport Layer Security (TLS) Protocol Version 1.3</title>
+          <author fullname="E. Rescorla" initials="E." surname="Rescorla">
+            <organization>Independent</organization>
+          </author>
+          <date month="May" year="2026"/>
+        </front>
+        <seriesInfo name="RFC" value="9846"/>
+        <seriesInfo name="DOI" value="10.17487/RFC9846"/>
+      </reference>
       <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9963.xml"/>
 
       <reference anchor="OIDC-Core"
