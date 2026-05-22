@@ -1553,6 +1553,17 @@ li > p:last-of-type:only-child {
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.4">
                 <p id="section-toc.1-1.7.2.4.1"><a href="#section-7.4" class="auto internal xref">7.4</a>.  <a href="#name-proof-of-possession-profile" class="internal xref">Proof-of-Possession Profile</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.4.2.1">
+                    <p id="section-toc.1-1.7.2.4.2.1.1"><a href="#section-7.4.1" class="auto internal xref">7.4.1</a>.  <a href="#name-mutual-tls-preferred" class="internal xref">Mutual TLS (Preferred)</a></p>
+</li>
+                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.4.2.2">
+                    <p id="section-toc.1-1.7.2.4.2.2.1"><a href="#section-7.4.2" class="auto internal xref">7.4.2</a>.  <a href="#name-dpop-alternative" class="internal xref">DPoP (Alternative)</a></p>
+</li>
+                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.4.2.3">
+                    <p id="section-toc.1-1.7.2.4.2.3.1"><a href="#section-7.4.3" class="auto internal xref">7.4.3</a>.  <a href="#name-combined-use-and-selection" class="internal xref">Combined Use and Selection</a></p>
+</li>
+                </ul>
 </li>
             </ul>
 </li>
@@ -3693,61 +3704,253 @@ urn:aid:com.1id:crusty              handle (different agent than global:crusty)
           issuance to the moment of token use.<a href="#section-7.4-1" class="pilcrow">¶</a></p>
 <p id="section-7.4-2">
           Two transport-level Proof-of-Possession mechanisms are
-          defined.  Issuers MUST support at least one.  Relying
-          Parties MAY accept either or both, and SHOULD advertise
-          which they accept in their published metadata.<a href="#section-7.4-2" class="pilcrow">¶</a></p>
-<span class="break"></span><dl class="dlParallel" id="section-7.4-3">
-          <dt id="section-7.4-3.1">DPoP (<span>[<a href="#RFC9449" class="cite xref">RFC9449</a>]</span>) -- RECOMMENDED</dt>
-          <dd style="margin-left: 1.5em" id="section-7.4-3.2">The agent attaches a <code>DPoP</code> header to every
-          HTTP request bearing the OIDC token.  The header contains
-          a short-lived JWS signed by the <code>cnf</code> key,
-          covering the HTTP method, target URI, a unique
-          <code>jti</code>, and a timestamp.  The Relying Party
-          verifies (a) the OIDC token signature against the
-          Issuer's JWKS, (b) that the DPoP proof's public key
-          thumbprint matches the token's <code>cnf.jkt</code>,
-          (c) the DPoP proof signature, (d) that <code>htm</code> and
-          <code>htu</code> match the request, and (e) that the
-          <code>jti</code> has not been seen recently.  No round-trip
-          to the Issuer is required.<a href="#section-7.4-3.2" class="pilcrow">¶</a>
+          defined: Mutual TLS (preferred) and DPoP (alternative).
+          Issuers MUST support both.  Relying Parties MUST support
+          at least one, and SHOULD advertise which they accept in
+          their published metadata.<a href="#section-7.4-2" class="pilcrow">¶</a></p>
+<div id="pop-mtls">
+<section id="section-7.4.1">
+          <h4 id="name-mutual-tls-preferred">
+<a href="#section-7.4.1" class="section-number selfRef">7.4.1. </a><a href="#name-mutual-tls-preferred" class="section-name selfRef">Mutual TLS (Preferred)</a>
+          </h4>
+<p id="section-7.4.1-1">
+            Mutual TLS (<span>[<a href="#RFC8705" class="cite xref">RFC8705</a>]</span>,
+            <span>[<a href="#RFC9846" class="cite xref">RFC9846</a>]</span>) is the RECOMMENDED
+            Proof-of-Possession mechanism for all trust tiers and
+            is REQUIRED for sovereign and portable tier agents when
+            the transport supports it.<a href="#section-7.4.1-1" class="pilcrow">¶</a></p>
+<p id="section-7.4.1-2">
+            The agent presents the <code>cnf</code> key as a TLS
+            client certificate during the TLS handshake.  The
+            Relying Party verifies that the certificate's public
+            key thumbprint matches the token's <code>cnf.jkt</code>.
+            Both endpoints MUST use TLS 1.3
+            (<span>[<a href="#RFC9846" class="cite xref">RFC9846</a>]</span>) or later.  Legacy
+            hardware that supports only RSASSA-PKCS1-v1_5
+            signatures MAY use the code points defined in
+            <span>[<a href="#RFC9963" class="cite xref">RFC9963</a>]</span> for the client
+            CertificateVerify; Relying Parties that accept
+            sovereign or portable tier agents SHOULD support
+            these legacy code points to avoid excluding hardware
+            that is otherwise fully capable.<a href="#section-7.4.1-2" class="pilcrow">¶</a></p>
+<p id="section-7.4.1-3">
+            Once established, the mTLS session provides
+            continuous mutual authentication and integrity for
+            all traffic within that connection.  No per-request
+            signature is required while the session remains open.
+            Both parties can be confident that they are
+            communicating with the genuine hardware-attested
+            endpoint, and that no intermediary can observe or
+            modify the traffic.<a href="#section-7.4.1-3" class="pilcrow">¶</a></p>
+<p id="section-7.4.1-4">
+            Relying Parties SHOULD NOT accept connections using
+            cipher suites or signature algorithms known to be
+            weak.  For sovereign and portable tier agents, Relying
+            Parties SHOULD reject TLS handshakes that negotiate
+            key exchange parameters below 128-bit equivalent
+            security strength.  This requirement is likely
+            redundant for high-consequence deployments, which
+            will have undergone prior certification that excludes
+            weak hardware, but is stated explicitly for
+            completeness.<a href="#section-7.4.1-4" class="pilcrow">¶</a></p>
+<p id="section-7.4.1-5">
+            Mutual TLS is preferred because it provides:<a href="#section-7.4.1-5" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-7.4.1-6.1">Man-in-the-middle resistance: the session key is
+            derived from a handshake authenticated by hardware
+            certificates at both ends, chaining to Root CA
+            bundles.<a href="#section-7.4.1-6.1" class="pilcrow">¶</a>
+</li>
+            <li class="normal" id="section-7.4.1-6.2">Traffic integrity: all data within the connection
+            is protected by authenticated encryption derived from
+            the handshake.<a href="#section-7.4.1-6.2" class="pilcrow">¶</a>
+</li>
+            <li class="normal" id="section-7.4.1-6.3">A single hardware signing operation (the client
+            CertificateVerify) to establish any number of
+            subsequent requests within the session, making it
+            practical even for high-throughput agents.<a href="#section-7.4.1-6.3" class="pilcrow">¶</a>
+</li>
+            <li class="normal" id="section-7.4.1-6.4">No opportunity for stolen artefacts to be
+            replayed: the session key is ephemeral and bound to
+            this specific connection. No information extractable
+            from logs, backups, or breach of either endpoint can
+            recreate the session on a different connection.<a href="#section-7.4.1-6.4" class="pilcrow">¶</a>
+</li>
+          </ul>
+</section>
+</div>
+<div id="pop-dpop">
+<section id="section-7.4.2">
+          <h4 id="name-dpop-alternative">
+<a href="#section-7.4.2" class="section-number selfRef">7.4.2. </a><a href="#name-dpop-alternative" class="section-name selfRef">DPoP (Alternative)</a>
+          </h4>
+<p id="section-7.4.2-1">
+            DPoP (<span>[<a href="#RFC9449" class="cite xref">RFC9449</a>]</span>) is an alternative
+            Proof-of-Possession mechanism for deployments where
+            mutual TLS is not feasible (for example, requests
+            transiting HTTP proxies, CDNs, API gateways that
+            terminate TLS, or asynchronous attestation in email
+            headers).<a href="#section-7.4.2-1" class="pilcrow">¶</a></p>
+<p id="section-7.4.2-2">
+            When DPoP is used under this specification, the
+            following requirements strengthen the base RFC 9449
+            profile to provide request-level integrity guarantees
+            equivalent to what mTLS provides at the connection
+            level:<a href="#section-7.4.2-2" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-7.4.2-3">
+            <dt id="section-7.4.2-3.1">jti (unique identifier) -- MUST</dt>
+            <dd style="margin-left: 1.5em" id="section-7.4.2-3.2">Every DPoP proof MUST contain a unique
+            <code>jti</code> claim.  Relying Parties MUST track
+            received <code>jti</code> values and MUST reject any
+            proof containing a <code>jti</code> that has been
+            previously presented within the token's validity
+            window plus clock skew tolerance.  A Relying Party
+            that does not enforce <code>jti</code> uniqueness MUST
+            NOT claim compliance with this specification.<a href="#section-7.4.2-3.2" class="pilcrow">¶</a>
+</dd>
+            <dd class="break"></dd>
+<dt id="section-7.4.2-3.3">nonce (server-issued) -- SHOULD</dt>
+            <dd style="margin-left: 1.5em" id="section-7.4.2-3.4">Relying Parties SHOULD issue a server nonce via
+            the <code>DPoP-Nonce</code> response header (per
+            <span>[<a href="#RFC9449" class="cite xref">RFC9449</a>]</span> Section 8).  When a nonce
+            has been issued, the agent MUST include the most
+            recent server nonce in the <code>nonce</code> claim of
+            its DPoP proof.  The Relying Party MUST reject proofs
+            that omit or contain a stale nonce when nonce
+            issuance is in effect.  This prevents pre-computation
+            of proofs and narrows the replay window to a single
+            request-response cycle.  Nonce is SHOULD rather than
+            MUST because some legitimate use cases (one-shot
+            requests, asynchronous email attestation) cannot
+            support the prior round-trip; in those cases,
+            <code>jti</code> enforcement, short <code>iat</code>
+            windows, and Content-Digest coverage provide the
+            residual protection.<a href="#section-7.4.2-3.4" class="pilcrow">¶</a>
+</dd>
+            <dd class="break"></dd>
+<dt id="section-7.4.2-3.5">Request-target coverage -- MUST</dt>
+            <dd style="margin-left: 1.5em" id="section-7.4.2-3.6">The DPoP proof MUST include <code>htm</code> (HTTP
+            method) and <code>htu</code> (target URI including the
+            full path and query string).  Relying Parties MUST
+            verify that both match the received request exactly.
+            Any difference -- including added, removed, or
+            modified query parameters -- MUST cause rejection.
+            Implementations MUST treat <code>htu</code> as the full
+            request-target (scheme, authority, path, and query)
+            as defined in Section 4 of <span>[<a href="#RFC9449" class="cite xref">RFC9449</a>]</span>;
+            stripping or ignoring the query component is a
+            violation of this specification.<a href="#section-7.4.2-3.6" class="pilcrow">¶</a>
+</dd>
+            <dd class="break"></dd>
+<dt id="section-7.4.2-3.7">Body coverage -- MUST</dt>
+            <dd style="margin-left: 1.5em" id="section-7.4.2-3.8">When the HTTP request carries a body, the agent
+            MUST include a <code>Content-Digest</code> header
+            (<span>[<a href="#RFC9530" class="cite xref">RFC9530</a>]</span>) containing a SHA-256 (or
+            stronger) digest of the request body.  The DPoP
+            proof MUST include an <code>ath</code> claim (access
+            token hash) AND a new <code>cdh</code> (content-digest
+            hash) claim containing the base64url-encoded SHA-256
+            hash of the <code>Content-Digest</code> header field
+            value.  Relying Parties MUST verify that the
+            <code>cdh</code> claim matches the received
+            <code>Content-Digest</code> header and that the
+            <code>Content-Digest</code> header matches the received
+            body.  A request with a body that lacks
+            <code>Content-Digest</code> or whose DPoP proof lacks
+            <code>cdh</code> MUST be rejected for sovereign,
+            portable, and enclave tiers.<a href="#section-7.4.2-3.8" class="pilcrow">¶</a>
+</dd>
+            <dd class="break"></dd>
+<dt id="section-7.4.2-3.9">Header coverage -- MUST</dt>
+            <dd style="margin-left: 1.5em" id="section-7.4.2-3.10">Inspired by the component coverage model of
+            <span>[<a href="#RFC9421" class="cite xref">RFC9421</a>]</span>, the DPoP proof MUST include
+            a <code>cov</code> (covered-headers) claim containing an
+            ordered list of HTTP header field names whose values
+            are incorporated into the proof signature.  At minimum, the following
+            headers MUST be covered when present:
+            <code>Content-Type</code>, <code>Content-Digest</code>,
+            <code>Authorization</code>, <code>Cookie</code>,
+            <code>DPoP</code>, and any header beginning with
+            <code>X-AID-</code> (reserved for application-layer
+            identity signals).  The DPoP proof's JWS payload MUST
+            include a <code>hvs</code> (header-values-SHA256) claim
+            containing the base64url-encoded SHA-256 hash of the
+            canonicalized covered header values (each header as
+            lowercase-name, colon, space, value, newline, in the
+            order listed in <code>cov</code>).  Relying Parties MUST
+            verify that <code>hvs</code> matches the canonicalized
+            headers of the received request and MUST reject
+            requests where covered headers have been modified,
+            added, or removed.<a href="#section-7.4.2-3.10" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
-<dt id="section-7.4-3.3">Mutual-TLS-bound tokens
-          (<span>[<a href="#RFC8705" class="cite xref">RFC8705</a>]</span>)</dt>
-          <dd style="margin-left: 1.5em" id="section-7.4-3.4">The agent presents the <code>cnf</code> key as a TLS
-          client certificate.  The Relying Party verifies that the
-          certificate's public key thumbprint matches the token's
-          <code>cnf.jkt</code>.  This mechanism suits deployments that
-          already operate mutual-TLS infrastructure.<a href="#section-7.4-3.4" class="pilcrow">¶</a>
-</dd>
-        <dd class="break"></dd>
 </dl>
-<p id="section-7.4-4">
-          For agents in the sovereign and portable trust tiers, the
-          DPoP proof signature (or the TLS client certificate's
-          private-key operation) SHOULD be performed by the
-          enrolled hardware-resident key itself, so that every
-          authenticated request is anchored in unclonable
-          hardware.  Where this is not operationally feasible
-          (for example, very high request rates), the agent MAY
-          delegate Proof-of-Possession to a software key whose
-          public key is signed by the hardware-resident key and
-          whose validity is short (one starting baseline is one
-          hour).  Implementations following the delegation
-          pattern MUST clearly distinguish hardware-signed from
-          software-delegated proofs in their security
-          documentation; this specification does not yet define a
-          wire format for the delegation certificate.<a href="#section-7.4-4" class="pilcrow">¶</a></p>
-<p id="section-7.4-5">
-          A Relying Party that verifies only the OIDC token
-          signature, without verifying the <code>cnf</code> binding
-          via DPoP or mTLS, is treating the token as a bearer
-          credential.  Such a Relying Party loses all of the
-          hardware-anchoring guarantees of this specification at
-          the moment of use, regardless of how the token was
-          issued.  Specifications and deployments that consume
-          AID tokens SHOULD make Proof-of-Possession verification
-          a hard requirement for any decision of consequence.<a href="#section-7.4-5" class="pilcrow">¶</a></p>
+<p id="section-7.4.2-4">
+            The combination of these requirements ensures that a
+            captured DPoP proof -- whether obtained from logs, a
+            network tap, a breached intermediary, or any other
+            source -- is cryptographic waste: it is bound to a
+            specific <code>jti</code> (non-replayable), a specific
+            nonce (expired after first use), a specific URI
+            including query string (non-transferable to other
+            endpoints), a specific body (non-modifiable), and
+            specific header values (non-tamperable).  An attacker
+            in possession of a complete captured request cannot
+            replay it, cannot modify it, and cannot redirect it.<a href="#section-7.4.2-4" class="pilcrow">¶</a></p>
+<p id="section-7.4.2-5">
+            For agents in the sovereign and portable trust tiers,
+            the DPoP proof signature SHOULD be performed by the
+            enrolled hardware-resident key itself.  Where this is
+            not operationally feasible (for example, request rates
+            that exceed the hardware's signing throughput), the
+            agent MAY delegate DPoP signing to a software key
+            whose public key is certified by the hardware-resident
+            key with a validity period no longer than one hour.
+            Implementations following the delegation pattern MUST
+            include the delegation certificate in the DPoP proof's
+            JWS header (in a new <code>dlg</code> field) so that
+            Relying Parties can verify the delegation chain.<a href="#section-7.4.2-5" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="pop-combined">
+<section id="section-7.4.3">
+          <h4 id="name-combined-use-and-selection">
+<a href="#section-7.4.3" class="section-number selfRef">7.4.3. </a><a href="#name-combined-use-and-selection" class="section-name selfRef">Combined Use and Selection</a>
+          </h4>
+<p id="section-7.4.3-1">
+            Agents and Relying Parties SHOULD prefer mutual TLS
+            when the deployment supports it.  When mTLS is
+            established, the per-request DPoP requirements above
+            are not needed -- the TLS session itself provides
+            integrity, authentication, and non-replayability for
+            all traffic within the connection.<a href="#section-7.4.3-1" class="pilcrow">¶</a></p>
+<p id="section-7.4.3-2">
+            DPoP is intended for scenarios where mutual TLS
+            cannot be established end-to-end: HTTP requests
+            traversing TLS-terminating proxies, API gateways,
+            CDNs, or asynchronous contexts such as email
+            attestation headers where no live TLS session exists
+            between the agent and the ultimate verifier.<a href="#section-7.4.3-2" class="pilcrow">¶</a></p>
+<p id="section-7.4.3-3">
+            When both mechanisms are available, a Relying Party
+            MAY require both simultaneously (mTLS for transport
+            security plus DPoP for per-request non-repudiation
+            logging).  This is appropriate for high-consequence
+            deployments where audit trails require independently
+            verifiable proof of each individual request's origin
+            and content.<a href="#section-7.4.3-3" class="pilcrow">¶</a></p>
+<p id="section-7.4.3-4">
+            A Relying Party that verifies only the OIDC token
+            signature, without verifying the <code>cnf</code> binding
+            via DPoP or mTLS, is treating the token as a bearer
+            credential.  Such a Relying Party loses all of the
+            hardware-anchoring guarantees of this specification at
+            the moment of use, regardless of how the token was
+            issued.  Deployments that consume AID tokens MUST
+            enforce Proof-of-Possession verification for any
+            decision of consequence.<a href="#section-7.4.3-4" class="pilcrow">¶</a></p>
+</section>
+</div>
 </section>
 </div>
 </section>
@@ -4215,10 +4418,12 @@ GET https://registry.example.com/lookup/urn:aid:global:id-9854187104
           protocols:<a href="#section-11.2-1" class="pilcrow">¶</a></p>
 <span class="break"></span><dl class="dlParallel" id="section-11.2-2">
           <dt id="section-11.2-2.1">Tool Invocation Protocols</dt>
-          <dd style="margin-left: 1.5em" id="section-11.2-2.2">Agent identity tokens can serve as the OAuth2
-          bearer token for tool invocation frameworks, enabling
-          tool servers to verify the calling agent's identity
-          and trust tier before granting access.<a href="#section-11.2-2.2" class="pilcrow">¶</a>
+          <dd style="margin-left: 1.5em" id="section-11.2-2.2">Agent identity tokens can serve as the
+          sender-constrained OAuth2 credential for tool
+          invocation frameworks, presented over mutual TLS or
+          with a DPoP proof per <a href="#pop-profile" class="auto internal xref">Section 7.4</a>,
+          enabling tool servers to verify the calling agent's
+          identity and trust tier before granting access.<a href="#section-11.2-2.2" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
 <dt id="section-11.2-2.3">Agent Messaging Protocols</dt>
@@ -4773,31 +4978,52 @@ GET https://registry.example.com/lookup/urn:aid:global:id-9854187104
           that omits Proof-of-Possession verification loses the
           hardware-anchoring guarantee at the moment of use.<a href="#section-13.4-2" class="pilcrow">¶</a></p>
 <p id="section-13.4-3">
-          A token-theft attack against a sovereign-tier agent
-          therefore requires one of the following: (a) physical
-          compromise of the enrolled hardware device (invasive
-          extraction, side channel, supply-chain interception),
-          which belongs to the hardware vendor's threat model and
-          is out of scope for this specification; (b) resident
-          malware on the legitimate host that invokes the
-          hardware signing API on the attacker's behalf, which
-          belongs to measured-boot, remote-attestation, and
+          When mutual TLS is used (<a href="#pop-mtls" class="auto internal xref">Section 7.4.1</a>),
+          the combination of hardware-backed client certificates,
+          ephemeral session keys, and authenticated encryption
+          means that no information extractable from logs,
+          backups, network captures, or breach of either endpoint
+          can be used to recreate the session on a different
+          connection or to impersonate either party.  The session
+          key is cryptographically bound to the specific TLS
+          handshake that produced it; it cannot be replayed,
+          transplanted, or reconstructed.<a href="#section-13.4-3" class="pilcrow">¶</a></p>
+<p id="section-13.4-4">
+          When DPoP is used (<a href="#pop-dpop" class="auto internal xref">Section 7.4.2</a>), the
+          strengthened profile defined in this specification
+          ensures that a captured DPoP proof is similarly useless:
+          it is bound to a unique <code>jti</code> (non-replayable),
+          a server nonce (expired after consumption), a specific
+          request-target including query string, a specific body
+          (via <code>Content-Digest</code> and <code>cdh</code>), and
+          specific header values (via <code>cov</code> and
+          <code>hvs</code>).  An attacker in possession of a complete
+          captured request cannot replay it, cannot modify it, and
+          cannot redirect it to a different endpoint.<a href="#section-13.4-4" class="pilcrow">¶</a></p>
+<p id="section-13.4-5">
+          The residual attack surface under both mechanisms is
+          limited to: (a) physical compromise of the enrolled
+          hardware device (invasive extraction, side channel,
+          supply-chain interception), which belongs to the
+          hardware vendor's threat model and is out of scope for
+          this specification; (b) resident malware on the
+          legitimate host that can invoke the hardware signing API
+          on the attacker's behalf, which belongs to
+          measured-boot, remote-attestation, and
           endpoint-protection systems layered above this one and
           is also out of scope; (c) compromise of the Registrar's
           signing key, addressed in
-          <a href="#sec-key-management" class="auto internal xref">Section 13.5</a>; or (d) deployment
-          against a Relying Party that does not enforce
-          Proof-of-Possession.  The shorter token lifetimes
-          recommended in <a href="#oidc-integration" class="auto internal xref">Section 7.1</a> bound
-          the residual impact of cases where Proof-of-Possession
-          enforcement is incomplete.  Honestly bounding the
-          attack surface in this way -- rather than overclaiming
-          host integrity -- is itself a load-bearing property of
-          this specification: deployers SHOULD pair AID with
-          host-integrity mechanisms (measured boot, runtime
-          attestation, endpoint detection) for any context where
-          resident malware is a credible threat.<a href="#section-13.4-3" class="pilcrow">¶</a></p>
-<p id="section-13.4-4">
+          <a href="#sec-key-management" class="auto internal xref">Section 13.5</a>; or
+          (d) a fully compromised Relying Party application layer,
+          which can act arbitrarily regardless of transport
+          security and is therefore out of scope.  Honestly
+          bounding the attack surface in this way -- rather than
+          overclaiming host integrity -- is itself a load-bearing
+          property of this specification: deployers SHOULD pair
+          AID with host-integrity mechanisms (measured boot,
+          runtime attestation, endpoint detection) for any context
+          where resident malware is a credible threat.<a href="#section-13.4-5" class="pilcrow">¶</a></p>
+<p id="section-13.4-6">
           The <code>attested_trust_tier</code> claim is bound to the
           token at issuance and reflects the device used for the
           most recent attestation.  If a hardware binding is
@@ -4808,7 +5034,7 @@ GET https://registry.example.com/lookup/urn:aid:global:id-9854187104
           short token lifetimes, MUST query the Issuer's
           introspection endpoint
           (<a href="#well-known-endpoints" class="auto internal xref">Section 9.1</a>) on each request,
-          or MUST trigger a hardware-backed re-authentication.<a href="#section-13.4-4" class="pilcrow">¶</a></p>
+          or MUST trigger a hardware-backed re-authentication.<a href="#section-13.4-6" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="sec-key-management">
@@ -5175,9 +5401,25 @@ GET https://registry.example.com/lookup/urn:aid:global:id-9854187104
       <dd>
 <span class="refAuthor">Campbell, B.</span>, <span class="refAuthor">Bradley, J.</span>, and <span class="refAuthor">H. Tschofenig</span>, <span class="refTitle">"Resource Indicators for OAuth 2.0"</span>, <span class="seriesInfo">RFC 8707</span>, <span class="seriesInfo">DOI 10.17487/RFC8707</span>, <time datetime="2020-02" class="refDate">February 2020</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc8707">https://www.rfc-editor.org/info/rfc8707</a>&gt;</span>. </dd>
 <dd class="break"></dd>
+<dt id="RFC9421">[RFC9421]</dt>
+      <dd>
+<span class="refAuthor">Backman, A., Ed.</span>, <span class="refAuthor">Richer, J., Ed.</span>, and <span class="refAuthor">M. Sporny</span>, <span class="refTitle">"HTTP Message Signatures"</span>, <span class="seriesInfo">RFC 9421</span>, <span class="seriesInfo">DOI 10.17487/RFC9421</span>, <time datetime="2024-02" class="refDate">February 2024</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc9421">https://www.rfc-editor.org/info/rfc9421</a>&gt;</span>. </dd>
+<dd class="break"></dd>
 <dt id="RFC9449">[RFC9449]</dt>
       <dd>
 <span class="refAuthor">Fett, D.</span>, <span class="refAuthor">Campbell, B.</span>, <span class="refAuthor">Bradley, J.</span>, <span class="refAuthor">Lodderstedt, T.</span>, <span class="refAuthor">Jones, M.</span>, and <span class="refAuthor">D. Waite</span>, <span class="refTitle">"OAuth 2.0 Demonstrating Proof of Possession (DPoP)"</span>, <span class="seriesInfo">RFC 9449</span>, <span class="seriesInfo">DOI 10.17487/RFC9449</span>, <time datetime="2023-09" class="refDate">September 2023</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc9449">https://www.rfc-editor.org/info/rfc9449</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9530">[RFC9530]</dt>
+      <dd>
+<span class="refAuthor">Polli, R.</span> and <span class="refAuthor">L. Pardue</span>, <span class="refTitle">"Digest Fields"</span>, <span class="seriesInfo">RFC 9530</span>, <span class="seriesInfo">DOI 10.17487/RFC9530</span>, <time datetime="2024-02" class="refDate">February 2024</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc9530">https://www.rfc-editor.org/info/rfc9530</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9846">[RFC9846]</dt>
+      <dd>
+<span class="refAuthor">Rescorla, E.</span>, <span class="refTitle">"The Transport Layer Security (TLS) Protocol Version 1.3"</span>, <span class="seriesInfo">RFC 9846</span>, <span class="seriesInfo">DOI 10.17487/RFC9846</span>, <time datetime="2026-05" class="refDate">May 2026</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc9846">https://www.rfc-editor.org/info/rfc9846</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9963">[RFC9963]</dt>
+      <dd>
+<span class="refAuthor">Benjamin, D.</span> and <span class="refAuthor">A. Popov</span>, <span class="refTitle">"Legacy RSASSA-PKCS1-v1_5 Code Points for TLS 1.3"</span>, <span class="seriesInfo">RFC 9963</span>, <span class="seriesInfo">DOI 10.17487/RFC9963</span>, <time datetime="2026-04" class="refDate">April 2026</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc9963">https://www.rfc-editor.org/info/rfc9963</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="OIDC-Core">[OIDC-Core]</dt>
     <dd>

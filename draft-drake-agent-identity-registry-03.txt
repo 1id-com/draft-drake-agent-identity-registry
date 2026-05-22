@@ -97,15 +97,15 @@ Copyright Notice
 
 Table of Contents
 
-   1.  Introduction  . . . . . . . . . . . . . . . . . . . . . . . .   4
+   1.  Introduction  . . . . . . . . . . . . . . . . . . . . . . . .   5
      1.1.  Design Principles . . . . . . . . . . . . . . . . . . . .   6
      1.2.  Requirements Language . . . . . . . . . . . . . . . . . .   8
      1.3.  Terminology . . . . . . . . . . . . . . . . . . . . . . .   8
-   2.  Architecture Overview . . . . . . . . . . . . . . . . . . . .   9
-     2.1.  Registry Hierarchy  . . . . . . . . . . . . . . . . . . .  10
-     2.2.  Namespace Types . . . . . . . . . . . . . . . . . . . . .  12
-   3.  Agent Identity Document . . . . . . . . . . . . . . . . . . .  14
-     3.1.  URN Format  . . . . . . . . . . . . . . . . . . . . . . .  14
+   2.  Architecture Overview . . . . . . . . . . . . . . . . . . . .  10
+     2.1.  Registry Hierarchy  . . . . . . . . . . . . . . . . . . .  11
+     2.2.  Namespace Types . . . . . . . . . . . . . . . . . . . . .  13
+   3.  Agent Identity Document . . . . . . . . . . . . . . . . . . .  15
+     3.1.  URN Format  . . . . . . . . . . . . . . . . . . . . . . .  15
 
 
 
@@ -114,54 +114,54 @@ Drake                   Expires 15 November 2026                [Page 2]
 Internet-Draft           Agent Identity Registry                May 2026
 
 
-       3.1.1.  Canonical Identifiers and Handles . . . . . . . . . .  15
-       3.1.2.  URN Examples and Uniqueness . . . . . . . . . . . . .  16
-     3.2.  Trust Tiers . . . . . . . . . . . . . . . . . . . . . . .  17
-     3.3.  Identity Attributes . . . . . . . . . . . . . . . . . . .  19
-     3.4.  Handle System . . . . . . . . . . . . . . . . . . . . . .  20
-       3.4.1.  Handle Display  . . . . . . . . . . . . . . . . . . .  21
-       3.4.2.  Handle Lifecycle  . . . . . . . . . . . . . . . . . .  21
-       3.4.3.  Reserved Handles  . . . . . . . . . . . . . . . . . .  21
-       3.4.4.  Handle Disputes . . . . . . . . . . . . . . . . . . .  22
-     3.5.  Optional Value-Added Services . . . . . . . . . . . . . .  22
-   4.  Hardware Attestation  . . . . . . . . . . . . . . . . . . . .  23
-     4.1.  Supported Hardware Mechanisms . . . . . . . . . . . . . .  23
-     4.2.  Anti-Sybil Invariants . . . . . . . . . . . . . . . . . .  24
-     4.3.  Global Hardware Trust Store . . . . . . . . . . . . . . .  25
-   5.  Enrollment Protocol . . . . . . . . . . . . . . . . . . . . .  25
-     5.1.  Sovereign Tier (TPM 2.0)  . . . . . . . . . . . . . . . .  26
-     5.2.  Portable Tier (PIV Smart Card)  . . . . . . . . . . . . .  27
-     5.3.  Enclave Tier (Secure Enclave) . . . . . . . . . . . . . .  27
-     5.4.  Declared Tier (Software-Only) . . . . . . . . . . . . . .  28
-   6.  Identity Lifecycle  . . . . . . . . . . . . . . . . . . . . .  28
-     6.1.  Device Addition and Migration . . . . . . . . . . . . . .  28
-     6.2.  Co-Location Binding . . . . . . . . . . . . . . . . . . .  29
-     6.3.  Hardware Lock . . . . . . . . . . . . . . . . . . . . . .  29
-     6.4.  Identity Recovery . . . . . . . . . . . . . . . . . . . .  29
-     6.5.  Succession (Cross-Registrar Transfer) . . . . . . . . . .  30
-     6.6.  Decommissioning . . . . . . . . . . . . . . . . . . . . .  31
-   7.  Authentication and Token Issuance . . . . . . . . . . . . . .  31
-     7.1.  OIDC/OAuth2 Integration . . . . . . . . . . . . . . . . .  31
-     7.2.  Client Credentials Grant  . . . . . . . . . . . . . . . .  34
-     7.3.  Hardware-Backed Challenge-Response Authentication . . . .  34
-     7.4.  Proof-of-Possession Profile . . . . . . . . . . . . . . .  35
-   8.  Agent Identity Registry Protocol (AIRP) . . . . . . . . . . .  36
-     8.1.  Identity Registration . . . . . . . . . . . . . . . . . .  36
-     8.2.  Hardware Fingerprint Uniqueness Check . . . . . . . . . .  37
-     8.3.  Identity Query  . . . . . . . . . . . . . . . . . . . . .  38
-     8.4.  Handle Operations . . . . . . . . . . . . . . . . . . . .  38
-     8.5.  Identity Transfer . . . . . . . . . . . . . . . . . . . .  39
-   9.  Discovery and Verification  . . . . . . . . . . . . . . . . .  39
-     9.1.  Well-Known Endpoints  . . . . . . . . . . . . . . . . . .  39
-     9.2.  DNS-Based Discovery . . . . . . . . . . . . . . . . . . .  40
-     9.3.  Registry Discovery Service  . . . . . . . . . . . . . . .  40
-   10. Governance Framework  . . . . . . . . . . . . . . . . . . . .  41
-     10.1.  Governance Authority Deployment Guidance . . . . . . . .  41
-     10.2.  Registry Operator Requirements . . . . . . . . . . . . .  42
-     10.3.  Registrar Accreditation  . . . . . . . . . . . . . . . .  42
-   11. Interoperability  . . . . . . . . . . . . . . . . . . . . . .  43
-     11.1.  Email Attestation  . . . . . . . . . . . . . . . . . . .  43
-     11.2.  Agent-to-Agent Protocols . . . . . . . . . . . . . . . .  43
+       3.1.1.  Canonical Identifiers and Handles . . . . . . . . . .  16
+       3.1.2.  URN Examples and Uniqueness . . . . . . . . . . . . .  17
+     3.2.  Trust Tiers . . . . . . . . . . . . . . . . . . . . . . .  18
+     3.3.  Identity Attributes . . . . . . . . . . . . . . . . . . .  20
+     3.4.  Handle System . . . . . . . . . . . . . . . . . . . . . .  21
+       3.4.1.  Handle Display  . . . . . . . . . . . . . . . . . . .  22
+       3.4.2.  Handle Lifecycle  . . . . . . . . . . . . . . . . . .  22
+       3.4.3.  Reserved Handles  . . . . . . . . . . . . . . . . . .  22
+       3.4.4.  Handle Disputes . . . . . . . . . . . . . . . . . . .  23
+     3.5.  Optional Value-Added Services . . . . . . . . . . . . . .  23
+   4.  Hardware Attestation  . . . . . . . . . . . . . . . . . . . .  24
+     4.1.  Supported Hardware Mechanisms . . . . . . . . . . . . . .  24
+     4.2.  Anti-Sybil Invariants . . . . . . . . . . . . . . . . . .  25
+     4.3.  Global Hardware Trust Store . . . . . . . . . . . . . . .  26
+   5.  Enrollment Protocol . . . . . . . . . . . . . . . . . . . . .  26
+     5.1.  Sovereign Tier (TPM 2.0)  . . . . . . . . . . . . . . . .  27
+     5.2.  Portable Tier (PIV Smart Card)  . . . . . . . . . . . . .  28
+     5.3.  Enclave Tier (Secure Enclave) . . . . . . . . . . . . . .  28
+     5.4.  Declared Tier (Software-Only) . . . . . . . . . . . . . .  29
+   6.  Identity Lifecycle  . . . . . . . . . . . . . . . . . . . . .  29
+     6.1.  Device Addition and Migration . . . . . . . . . . . . . .  29
+     6.2.  Co-Location Binding . . . . . . . . . . . . . . . . . . .  30
+     6.3.  Hardware Lock . . . . . . . . . . . . . . . . . . . . . .  30
+     6.4.  Identity Recovery . . . . . . . . . . . . . . . . . . . .  30
+     6.5.  Succession (Cross-Registrar Transfer) . . . . . . . . . .  31
+     6.6.  Decommissioning . . . . . . . . . . . . . . . . . . . . .  32
+   7.  Authentication and Token Issuance . . . . . . . . . . . . . .  32
+     7.1.  OIDC/OAuth2 Integration . . . . . . . . . . . . . . . . .  32
+     7.2.  Client Credentials Grant  . . . . . . . . . . . . . . . .  35
+     7.3.  Hardware-Backed Challenge-Response Authentication . . . .  35
+     7.4.  Proof-of-Possession Profile . . . . . . . . . . . . . . .  36
+       7.4.1.  Mutual TLS (Preferred)  . . . . . . . . . . . . . . .  36
+       7.4.2.  DPoP (Alternative)  . . . . . . . . . . . . . . . . .  37
+       7.4.3.  Combined Use and Selection  . . . . . . . . . . . . .  39
+   8.  Agent Identity Registry Protocol (AIRP) . . . . . . . . . . .  40
+     8.1.  Identity Registration . . . . . . . . . . . . . . . . . .  40
+     8.2.  Hardware Fingerprint Uniqueness Check . . . . . . . . . .  41
+     8.3.  Identity Query  . . . . . . . . . . . . . . . . . . . . .  41
+     8.4.  Handle Operations . . . . . . . . . . . . . . . . . . . .  42
+     8.5.  Identity Transfer . . . . . . . . . . . . . . . . . . . .  42
+   9.  Discovery and Verification  . . . . . . . . . . . . . . . . .  43
+     9.1.  Well-Known Endpoints  . . . . . . . . . . . . . . . . . .  43
+     9.2.  DNS-Based Discovery . . . . . . . . . . . . . . . . . . .  43
+     9.3.  Registry Discovery Service  . . . . . . . . . . . . . . .  44
+   10. Governance Framework  . . . . . . . . . . . . . . . . . . . .  44
+     10.1.  Governance Authority Deployment Guidance . . . . . . . .  44
+     10.2.  Registry Operator Requirements . . . . . . . . . . . . .  45
+     10.3.  Registrar Accreditation  . . . . . . . . . . . . . . . .  46
 
 
 
@@ -170,53 +170,53 @@ Drake                   Expires 15 November 2026                [Page 3]
 Internet-Draft           Agent Identity Registry                May 2026
 
 
-     11.3.  Existing Identity Standards  . . . . . . . . . . . . . .  43
-     11.4.  Robot Fleet Management Systems . . . . . . . . . . . . .  45
-       11.4.1.  Supply Chain Integrity . . . . . . . . . . . . . . .  47
-       11.4.2.  High-Assurance and Regulated Environments  . . . . .  48
-     11.5.  Human-Readable Display Conventions . . . . . . . . . . .  49
-   12. IANA Considerations . . . . . . . . . . . . . . . . . . . . .  49
-     12.1.  URN Namespace  . . . . . . . . . . . . . . . . . . . . .  49
-     12.2.  Well-Known URI Registration  . . . . . . . . . . . . . .  49
-     12.3.  Shared Namespace Registry  . . . . . . . . . . . . . . .  49
-   13. Security Considerations . . . . . . . . . . . . . . . . . . .  50
-     13.1.  Registry Compromise  . . . . . . . . . . . . . . . . . .  50
-     13.2.  Registrar Malpractice  . . . . . . . . . . . . . . . . .  50
-     13.3.  Hardware Security  . . . . . . . . . . . . . . . . . . .  51
-     13.4.  Token Theft and Sender-Constrained Tokens  . . . . . . .  51
-     13.5.  Registrar Key Management . . . . . . . . . . . . . . . .  52
-     13.6.  Revocation Model . . . . . . . . . . . . . . . . . . . .  52
-     13.7.  Availability and Resilience  . . . . . . . . . . . . . .  53
-     13.8.  Centralised Substrate Functions  . . . . . . . . . . . .  53
-   14. Privacy Considerations  . . . . . . . . . . . . . . . . . . .  53
-     14.1.  Identifiability of Non-Human Actors  . . . . . . . . . .  53
-     14.2.  Data Held by Each Architectural Role . . . . . . . . . .  54
-     14.3.  Separation of Identity from Behaviour  . . . . . . . . .  54
-     14.4.  Pseudonymity and Selective Disclosure  . . . . . . . . .  54
-   15. Implementation Status . . . . . . . . . . . . . . . . . . . .  55
-     15.1.  1id.com  . . . . . . . . . . . . . . . . . . . . . . . .  55
-     15.2.  MailPal.com (Relying Party)  . . . . . . . . . . . . . .  56
-     15.3.  geek.au (Relying Party)  . . . . . . . . . . . . . . . .  56
-   16. Normative References  . . . . . . . . . . . . . . . . . . . .  56
-   17. Informative References  . . . . . . . . . . . . . . . . . . .  57
-   Appendix A.  Appendix: DNS Registry Analogy . . . . . . . . . . .  59
+   11. Interoperability  . . . . . . . . . . . . . . . . . . . . . .  46
+     11.1.  Email Attestation  . . . . . . . . . . . . . . . . . . .  46
+     11.2.  Agent-to-Agent Protocols . . . . . . . . . . . . . . . .  46
+     11.3.  Existing Identity Standards  . . . . . . . . . . . . . .  47
+     11.4.  Robot Fleet Management Systems . . . . . . . . . . . . .  48
+       11.4.1.  Supply Chain Integrity . . . . . . . . . . . . . . .  50
+       11.4.2.  High-Assurance and Regulated Environments  . . . . .  51
+     11.5.  Human-Readable Display Conventions . . . . . . . . . . .  52
+   12. IANA Considerations . . . . . . . . . . . . . . . . . . . . .  53
+     12.1.  URN Namespace  . . . . . . . . . . . . . . . . . . . . .  53
+     12.2.  Well-Known URI Registration  . . . . . . . . . . . . . .  53
+     12.3.  Shared Namespace Registry  . . . . . . . . . . . . . . .  53
+   13. Security Considerations . . . . . . . . . . . . . . . . . . .  53
+     13.1.  Registry Compromise  . . . . . . . . . . . . . . . . . .  53
+     13.2.  Registrar Malpractice  . . . . . . . . . . . . . . . . .  54
+     13.3.  Hardware Security  . . . . . . . . . . . . . . . . . . .  54
+     13.4.  Token Theft and Sender-Constrained Tokens  . . . . . . .  54
+     13.5.  Registrar Key Management . . . . . . . . . . . . . . . .  56
+     13.6.  Revocation Model . . . . . . . . . . . . . . . . . . . .  56
+     13.7.  Availability and Resilience  . . . . . . . . . . . . . .  57
+     13.8.  Centralised Substrate Functions  . . . . . . . . . . . .  57
+   14. Privacy Considerations  . . . . . . . . . . . . . . . . . . .  57
+     14.1.  Identifiability of Non-Human Actors  . . . . . . . . . .  57
+     14.2.  Data Held by Each Architectural Role . . . . . . . . . .  58
+     14.3.  Separation of Identity from Behaviour  . . . . . . . . .  58
+     14.4.  Pseudonymity and Selective Disclosure  . . . . . . . . .  58
+   15. Implementation Status . . . . . . . . . . . . . . . . . . . .  59
+     15.1.  1id.com  . . . . . . . . . . . . . . . . . . . . . . . .  59
+     15.2.  MailPal.com (Relying Party)  . . . . . . . . . . . . . .  60
+     15.3.  geek.au (Relying Party)  . . . . . . . . . . . . . . . .  60
+   16. Normative References  . . . . . . . . . . . . . . . . . . . .  60
+   17. Informative References  . . . . . . . . . . . . . . . . . . .  62
+   Appendix A.  Appendix: DNS Registry Analogy . . . . . . . . . . .  63
    Appendix B.  Appendix: Future Considerations for Autonomous
-           Entities  . . . . . . . . . . . . . . . . . . . . . . . .  61
-     B.1.  Embodied Autonomous Entities (Robots) . . . . . . . . . .  61
-     B.2.  Operator-Optional Identity  . . . . . . . . . . . . . . .  62
-     B.3.  Autonomous Agent-to-Agent Communication . . . . . . . . .  62
-     B.4.  Inter-Species Identity Recognition  . . . . . . . . . . .  62
-     B.5.  Longevity and Digital Legacy  . . . . . . . . . . . . . .  63
-   Appendix C.  Acknowledgements . . . . . . . . . . . . . . . . . .  63
-   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . .  64
+           Entities  . . . . . . . . . . . . . . . . . . . . . . . .  65
+     B.1.  Embodied Autonomous Entities (Robots) . . . . . . . . . .  65
+     B.2.  Operator-Optional Identity  . . . . . . . . . . . . . . .  66
+     B.3.  Autonomous Agent-to-Agent Communication . . . . . . . . .  66
+     B.4.  Inter-Species Identity Recognition  . . . . . . . . . . .  66
+     B.5.  Longevity and Digital Legacy  . . . . . . . . . . . . . .  67
+   Appendix C.  Acknowledgements . . . . . . . . . . . . . . . . . .  67
+   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . .  68
 
-1.  Introduction
 
-   The Internet was designed for communication between humans operating
-   machines.  Every identity layer -- email addresses, domain names, TLS
-   certificates, OAuth2 tokens -- assumes a human principal or a human-
-   operated organisation at the root of trust.  This assumption is
-   becoming obsolete.
+
+
+
 
 
 
@@ -225,6 +225,14 @@ Drake                   Expires 15 November 2026                [Page 4]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
+
+1.  Introduction
+
+   The Internet was designed for communication between humans operating
+   machines.  Every identity layer -- email addresses, domain names, TLS
+   certificates, OAuth2 tokens -- assumes a human principal or a human-
+   operated organisation at the root of trust.  This assumption is
+   becoming obsolete.
 
    As of early 2026, tens of millions of autonomous AI agents operate
    continuously on the public Internet: managing advertising campaigns,
@@ -266,14 +274,6 @@ Internet-Draft           Agent Identity Registry                May 2026
    match: creating N fake identities requires purchasing N physical
    devices.
 
-   The architecture is modeled on the Internet domain name system -- the
-   most successful federated registry in history.  Just as DNS separates
-   policy (ICANN), registry operation (Verisign for .com), and retail
-   registration (GoDaddy, Namecheap), this system separates:
-
-   *  *Governance*: A governance authority that sets policy, accredits
-      operators, and manages the global hardware trust store.
-
 
 
 
@@ -281,6 +281,14 @@ Drake                   Expires 15 November 2026                [Page 5]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
+
+   The architecture is modeled on the Internet domain name system -- the
+   most successful federated registry in history.  Just as DNS separates
+   policy (ICANN), registry operation (Verisign for .com), and retail
+   registration (GoDaddy, Namecheap), this system separates:
+
+   *  *Governance*: A governance authority that sets policy, accredits
+      operators, and manages the global hardware trust store.
 
    *  *Registry operation*: Registry Operators that maintain
       authoritative identity databases, enforce cross-Registrar hardware
@@ -320,14 +328,6 @@ Internet-Draft           Agent Identity Registry                May 2026
       functions, containers, embedded systems).
 
    Federated by Design  No single organisation controls identity
-      issuance.  Multiple Registrars compete to serve agents.  Multiple
-      Registry Operators may serve different namespaces.  The system is
-      designed so that the failure or malfeasance of any single
-      participant does not compromise the entire ecosystem.
-
-   Standard Tokens, Minimal Integration  Identities are expressed as
-
-
 
 
 
@@ -338,6 +338,12 @@ Drake                   Expires 15 November 2026                [Page 6]
 Internet-Draft           Agent Identity Registry                May 2026
 
 
+      issuance.  Multiple Registrars compete to serve agents.  Multiple
+      Registry Operators may serve different namespaces.  The system is
+      designed so that the failure or malfeasance of any single
+      participant does not compromise the entire ecosystem.
+
+   Standard Tokens, Minimal Integration  Identities are expressed as
       standard OIDC/OAuth2 tokens.  Token signature verification uses
       existing OIDC libraries.  Hardware attestation complexity is
       hidden behind the enrollment API; relying parties see standard
@@ -373,6 +379,21 @@ Internet-Draft           Agent Identity Registry                May 2026
       require identity reassignment when properties change.
 
    Identity is Never Revoked  An identity, like a birth certificate,
+
+
+
+
+
+
+
+
+
+
+Drake                   Expires 15 November 2026                [Page 7]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
       cannot be revoked.  The URN is a permanent record of existence.
       What can change is the operational state of things attached to the
       identity: device bindings can be revoked (hardware compromised or
@@ -384,16 +405,6 @@ Internet-Draft           Agent Identity Registry                May 2026
       revocation (which does) is fundamental to the architecture.
 
    Transport Independence  The identity tokens and attestation formats
-
-
-
-
-
-Drake                   Expires 15 November 2026                [Page 7]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
-
       defined here are usable across any Internet protocol: email, HTTP,
       WebSocket, agent-to-agent messaging, MCP tool invocation, and
       protocols not yet invented.
@@ -428,6 +439,17 @@ Internet-Draft           Agent Identity Registry                May 2026
       governance authority.
 
    Registry Operator  An organisation accredited by the governance
+
+
+
+
+
+
+Drake                   Expires 15 November 2026                [Page 8]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
       authority to maintain the authoritative database of Agent Identity
       Documents within one or more namespaces.  Analogous to Verisign
       operating the .com registry.  The Registry Operator enforces
@@ -442,14 +464,6 @@ Internet-Draft           Agent Identity Registry                May 2026
       identified by a registrar-code assigned during accreditation.
 
    Namespace  A partition of the agent identity space, identified by a
-
-
-
-Drake                   Expires 15 November 2026                [Page 8]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
-
       label in the URN structure.  Two types exist: Delegated Namespaces
       (managed by a Registry Operator, with multiple Registrars) and
       Domain-Scoped Issuer Namespaces (operated by a single organisation
@@ -483,6 +497,15 @@ Internet-Draft           Agent Identity Registry                May 2026
       performing peer verification.
 
    Succession  The process by which an agent's identity is transferred
+
+
+
+
+Drake                   Expires 15 November 2026                [Page 9]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
       from one Registrar to another, or from a Registrar to a new
       identity under a different namespace, while preserving a
       cryptographic link to the original identity for reputation
@@ -501,7 +524,40 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026                [Page 9]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Drake                   Expires 15 November 2026               [Page 10]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -557,7 +613,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 10]
+Drake                   Expires 15 November 2026               [Page 11]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -613,7 +669,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 11]
+Drake                   Expires 15 November 2026               [Page 12]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -669,7 +725,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 12]
+Drake                   Expires 15 November 2026               [Page 13]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -725,7 +781,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 13]
+Drake                   Expires 15 November 2026               [Page 14]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -781,7 +837,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 14]
+Drake                   Expires 15 November 2026               [Page 15]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -837,7 +893,7 @@ urn:aid:com.1id:crusty              handle (different agent than global:crusty)
 
 
 
-Drake                   Expires 15 November 2026               [Page 15]
+Drake                   Expires 15 November 2026               [Page 16]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -893,7 +949,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 16]
+Drake                   Expires 15 November 2026               [Page 17]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -949,7 +1005,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 17]
+Drake                   Expires 15 November 2026               [Page 18]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1005,7 +1061,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 18]
+Drake                   Expires 15 November 2026               [Page 19]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1061,7 +1117,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 19]
+Drake                   Expires 15 November 2026               [Page 20]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1117,7 +1173,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 20]
+Drake                   Expires 15 November 2026               [Page 21]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1173,7 +1229,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 21]
+Drake                   Expires 15 November 2026               [Page 22]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1229,7 +1285,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 22]
+Drake                   Expires 15 November 2026               [Page 23]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1285,7 +1341,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 23]
+Drake                   Expires 15 November 2026               [Page 24]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1341,7 +1397,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 24]
+Drake                   Expires 15 November 2026               [Page 25]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1397,7 +1453,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 25]
+Drake                   Expires 15 November 2026               [Page 26]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1453,7 +1509,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 26]
+Drake                   Expires 15 November 2026               [Page 27]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1509,7 +1565,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 27]
+Drake                   Expires 15 November 2026               [Page 28]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1565,7 +1621,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 28]
+Drake                   Expires 15 November 2026               [Page 29]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1621,7 +1677,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 29]
+Drake                   Expires 15 November 2026               [Page 30]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1677,7 +1733,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 30]
+Drake                   Expires 15 November 2026               [Page 31]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1733,7 +1789,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 31]
+Drake                   Expires 15 November 2026               [Page 32]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1789,7 +1845,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 32]
+Drake                   Expires 15 November 2026               [Page 33]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1845,7 +1901,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 33]
+Drake                   Expires 15 November 2026               [Page 34]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1901,7 +1957,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 34]
+Drake                   Expires 15 November 2026               [Page 35]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -1932,56 +1988,217 @@ Internet-Draft           Agent Identity Registry                May 2026
    anchored property of the identity from the moment of token issuance
    to the moment of token use.
 
-   Two transport-level Proof-of-Possession mechanisms are defined.
-   Issuers MUST support at least one.  Relying Parties MAY accept either
-   or both, and SHOULD advertise which they accept in their published
-   metadata.
+   Two transport-level Proof-of-Possession mechanisms are defined:
+   Mutual TLS (preferred) and DPoP (alternative).  Issuers MUST support
+   both.  Relying Parties MUST support at least one, and SHOULD
+   advertise which they accept in their published metadata.
 
-   DPoP ([RFC9449]) -- RECOMMENDED  The agent attaches a DPoP header to
-      every HTTP request bearing the OIDC token.  The header contains a
-      short-lived JWS signed by the cnf key, covering the HTTP method,
-      target URI, a unique jti, and a timestamp.  The Relying Party
-      verifies (a) the OIDC token signature against the Issuer's JWKS,
-      (b) that the DPoP proof's public key thumbprint matches the
-      token's cnf.jkt, (c) the DPoP proof signature, (d) that htm and
-      htu match the request, and (e) that the jti has not been seen
-      recently.  No round-trip to the Issuer is required.
+7.4.1.  Mutual TLS (Preferred)
 
-   Mutual-TLS-bound tokens ([RFC8705])  The agent presents the cnf key
-      as a TLS client certificate.  The Relying Party verifies that the
-      certificate's public key thumbprint matches the token's cnf.jkt.
-      This mechanism suits deployments that already operate mutual-TLS
-      infrastructure.
+   Mutual TLS ([RFC8705], [RFC9846]) is the RECOMMENDED Proof-of-
+   Possession mechanism for all trust tiers and is REQUIRED for
+   sovereign and portable tier agents when the transport supports it.
 
-
+   The agent presents the cnf key as a TLS client certificate during the
+   TLS handshake.  The Relying Party verifies that the certificate's
+   public key thumbprint matches the token's cnf.jkt.  Both endpoints
+   MUST use TLS 1.3 ([RFC9846]) or later.  Legacy hardware that supports
+   only RSASSA-PKCS1-v1_5 signatures MAY use the code points defined in
+   [RFC9963] for the client CertificateVerify; Relying Parties that
+   accept sovereign or portable tier agents SHOULD support these legacy
+   code points to avoid excluding hardware that is otherwise fully
+   capable.
 
 
 
-Drake                   Expires 15 November 2026               [Page 35]
+
+
+Drake                   Expires 15 November 2026               [Page 36]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
 
+   Once established, the mTLS session provides continuous mutual
+   authentication and integrity for all traffic within that connection.
+   No per-request signature is required while the session remains open.
+   Both parties can be confident that they are communicating with the
+   genuine hardware-attested endpoint, and that no intermediary can
+   observe or modify the traffic.
+
+   Relying Parties SHOULD NOT accept connections using cipher suites or
+   signature algorithms known to be weak.  For sovereign and portable
+   tier agents, Relying Parties SHOULD reject TLS handshakes that
+   negotiate key exchange parameters below 128-bit equivalent security
+   strength.  This requirement is likely redundant for high-consequence
+   deployments, which will have undergone prior certification that
+   excludes weak hardware, but is stated explicitly for completeness.
+
+   Mutual TLS is preferred because it provides:
+
+   *  Man-in-the-middle resistance: the session key is derived from a
+      handshake authenticated by hardware certificates at both ends,
+      chaining to Root CA bundles.
+
+   *  Traffic integrity: all data within the connection is protected by
+      authenticated encryption derived from the handshake.
+
+   *  A single hardware signing operation (the client CertificateVerify)
+      to establish any number of subsequent requests within the session,
+      making it practical even for high-throughput agents.
+
+   *  No opportunity for stolen artefacts to be replayed: the session
+      key is ephemeral and bound to this specific connection.  No
+      information extractable from logs, backups, or breach of either
+      endpoint can recreate the session on a different connection.
+
+7.4.2.  DPoP (Alternative)
+
+   DPoP ([RFC9449]) is an alternative Proof-of-Possession mechanism for
+   deployments where mutual TLS is not feasible (for example, requests
+   transiting HTTP proxies, CDNs, API gateways that terminate TLS, or
+   asynchronous attestation in email headers).
+
+   When DPoP is used under this specification, the following
+   requirements strengthen the base RFC 9449 profile to provide request-
+   level integrity guarantees equivalent to what mTLS provides at the
+   connection level:
+
+   jti (unique identifier) -- MUST  Every DPoP proof MUST contain a
+
+
+
+
+
+Drake                   Expires 15 November 2026               [Page 37]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
+      unique jti claim.  Relying Parties MUST track received jti values
+      and MUST reject any proof containing a jti that has been
+      previously presented within the token's validity window plus clock
+      skew tolerance.  A Relying Party that does not enforce jti
+      uniqueness MUST NOT claim compliance with this specification.
+
+   nonce (server-issued) -- SHOULD  Relying Parties SHOULD issue a
+      server nonce via the DPoP-Nonce response header (per [RFC9449]
+      Section 8).  When a nonce has been issued, the agent MUST include
+      the most recent server nonce in the nonce claim of its DPoP proof.
+      The Relying Party MUST reject proofs that omit or contain a stale
+      nonce when nonce issuance is in effect.  This prevents pre-
+      computation of proofs and narrows the replay window to a single
+      request-response cycle.  Nonce is SHOULD rather than MUST because
+      some legitimate use cases (one-shot requests, asynchronous email
+      attestation) cannot support the prior round-trip; in those cases,
+      jti enforcement, short iat windows, and Content-Digest coverage
+      provide the residual protection.
+
+   Request-target coverage -- MUST  The DPoP proof MUST include htm
+      (HTTP method) and htu (target URI including the full path and
+      query string).  Relying Parties MUST verify that both match the
+      received request exactly.  Any difference -- including added,
+      removed, or modified query parameters -- MUST cause rejection.
+      Implementations MUST treat htu as the full request-target (scheme,
+      authority, path, and query) as defined in Section 4 of [RFC9449];
+      stripping or ignoring the query component is a violation of this
+      specification.
+
+   Body coverage -- MUST  When the HTTP request carries a body, the
+      agent MUST include a Content-Digest header ([RFC9530]) containing
+      a SHA-256 (or stronger) digest of the request body.  The DPoP
+      proof MUST include an ath claim (access token hash) AND a new cdh
+      (content-digest hash) claim containing the base64url-encoded
+      SHA-256 hash of the Content-Digest header field value.  Relying
+      Parties MUST verify that the cdh claim matches the received
+      Content-Digest header and that the Content-Digest header matches
+      the received body.  A request with a body that lacks Content-
+      Digest or whose DPoP proof lacks cdh MUST be rejected for
+      sovereign, portable, and enclave tiers.
+
+   Header coverage -- MUST  Inspired by the component coverage model of
+      [RFC9421], the DPoP proof MUST include a cov (covered-headers)
+      claim containing an ordered list of HTTP header field names whose
+      values are incorporated into the proof signature.  At minimum, the
+      following headers MUST be covered when present: Content-Type,
+      Content-Digest, Authorization, Cookie, DPoP, and any header
+      beginning with X-AID- (reserved for application-layer identity
+
+
+
+Drake                   Expires 15 November 2026               [Page 38]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
+      signals).  The DPoP proof's JWS payload MUST include a hvs
+      (header-values-SHA256) claim containing the base64url-encoded
+      SHA-256 hash of the canonicalized covered header values (each
+      header as lowercase-name, colon, space, value, newline, in the
+      order listed in cov).  Relying Parties MUST verify that hvs
+      matches the canonicalized headers of the received request and MUST
+      reject requests where covered headers have been modified, added,
+      or removed.
+
+   The combination of these requirements ensures that a captured DPoP
+   proof -- whether obtained from logs, a network tap, a breached
+   intermediary, or any other source -- is cryptographic waste: it is
+   bound to a specific jti (non-replayable), a specific nonce (expired
+   after first use), a specific URI including query string (non-
+   transferable to other endpoints), a specific body (non-modifiable),
+   and specific header values (non-tamperable).  An attacker in
+   possession of a complete captured request cannot replay it, cannot
+   modify it, and cannot redirect it.
+
    For agents in the sovereign and portable trust tiers, the DPoP proof
-   signature (or the TLS client certificate's private-key operation)
-   SHOULD be performed by the enrolled hardware-resident key itself, so
-   that every authenticated request is anchored in unclonable hardware.
-   Where this is not operationally feasible (for example, very high
-   request rates), the agent MAY delegate Proof-of-Possession to a
-   software key whose public key is signed by the hardware-resident key
-   and whose validity is short (one starting baseline is one hour).
-   Implementations following the delegation pattern MUST clearly
-   distinguish hardware-signed from software-delegated proofs in their
-   security documentation; this specification does not yet define a wire
-   format for the delegation certificate.
+   signature SHOULD be performed by the enrolled hardware-resident key
+   itself.  Where this is not operationally feasible (for example,
+   request rates that exceed the hardware's signing throughput), the
+   agent MAY delegate DPoP signing to a software key whose public key is
+   certified by the hardware-resident key with a validity period no
+   longer than one hour.  Implementations following the delegation
+   pattern MUST include the delegation certificate in the DPoP proof's
+   JWS header (in a new dlg field) so that Relying Parties can verify
+   the delegation chain.
+
+7.4.3.  Combined Use and Selection
+
+   Agents and Relying Parties SHOULD prefer mutual TLS when the
+   deployment supports it.  When mTLS is established, the per-request
+   DPoP requirements above are not needed -- the TLS session itself
+   provides integrity, authentication, and non-replayability for all
+   traffic within the connection.
+
+   DPoP is intended for scenarios where mutual TLS cannot be established
+   end-to-end: HTTP requests traversing TLS-terminating proxies, API
+   gateways, CDNs, or asynchronous contexts such as email attestation
+   headers where no live TLS session exists between the agent and the
+   ultimate verifier.
+
+
+
+
+
+
+
+
+Drake                   Expires 15 November 2026               [Page 39]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
+   When both mechanisms are available, a Relying Party MAY require both
+   simultaneously (mTLS for transport security plus DPoP for per-request
+   non-repudiation logging).  This is appropriate for high-consequence
+   deployments where audit trails require independently verifiable proof
+   of each individual request's origin and content.
 
    A Relying Party that verifies only the OIDC token signature, without
    verifying the cnf binding via DPoP or mTLS, is treating the token as
    a bearer credential.  Such a Relying Party loses all of the hardware-
    anchoring guarantees of this specification at the moment of use,
-   regardless of how the token was issued.  Specifications and
-   deployments that consume AID tokens SHOULD make Proof-of-Possession
-   verification a hard requirement for any decision of consequence.
+   regardless of how the token was issued.  Deployments that consume AID
+   tokens MUST enforce Proof-of-Possession verification for any decision
+   of consequence.
 
 8.  Agent Identity Registry Protocol (AIRP)
 
@@ -1995,28 +2212,6 @@ Internet-Draft           Agent Identity Registry                May 2026
    operations are RESTful JSON APIs.
 
 8.1.  Identity Registration
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Drake                   Expires 15 November 2026               [Page 36]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
 
    POST /airp/v1/identities
    Content-Type: application/json
@@ -2039,6 +2234,14 @@ Internet-Draft           Agent Identity Registry                May 2026
      "registrar_code": "1IDCOM"
    }
 
+
+
+
+Drake                   Expires 15 November 2026               [Page 40]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
    The Registry Operator MUST:
 
    *  Verify that the agent-id is unique within the namespace.
@@ -2051,28 +2254,6 @@ Internet-Draft           Agent Identity Registry                May 2026
    *  Return the canonical URN.
 
 8.2.  Hardware Fingerprint Uniqueness Check
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Drake                   Expires 15 November 2026               [Page 37]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
 
    GET /airp/v1/hardware/sha256:a1b2c3d4.../check
 
@@ -2100,6 +2281,23 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 8.3.  Identity Query
 
+
+
+
+
+
+
+
+
+
+
+
+
+Drake                   Expires 15 November 2026               [Page 41]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
    GET /airp/v1/identities/urn:aid:global:id-9854187104
 
    200 OK
@@ -2122,13 +2320,6 @@ Internet-Draft           Agent Identity Registry                May 2026
    within the namespace.  The Registry Operator's role is uniqueness
    enforcement and authoritative resolution; handle service terms are
    determined by the Registrar.
-
-
-
-Drake                   Expires 15 November 2026               [Page 38]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
 
 8.5.  Identity Transfer
 
@@ -2155,6 +2346,14 @@ Internet-Draft           Agent Identity Registry                May 2026
    the gaining Registrar, using a currently active enrolled device.
    This prevents unauthorised transfers.
 
+
+
+
+Drake                   Expires 15 November 2026               [Page 42]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
 9.  Discovery and Verification
 
 9.1.  Well-Known Endpoints
@@ -2179,13 +2378,6 @@ Internet-Draft           Agent Identity Registry                May 2026
       itself, on a case-by-case basis, using selective-disclosure
       mechanisms defined in [I-D.drake-email-hardware-attestation].
 
-
-
-Drake                   Expires 15 November 2026               [Page 39]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
-
    /.well-known/jwks.json  JSON Web Key Set for token signature
       verification.
 
@@ -2207,6 +2399,16 @@ Internet-Draft           Agent Identity Registry                May 2026
    endpoint:
 
    _airp._tcp.global.aid.arpa.  IN SRV 0 0 443 registry.example.com.
+
+
+
+
+
+
+Drake                   Expires 15 November 2026               [Page 43]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
 
 9.3.  Registry Discovery Service
 
@@ -2230,17 +2432,6 @@ Internet-Draft           Agent Identity Registry                May 2026
      "status": "active",
      "jwks_uri": "https://1id.com/.well-known/jwks.json"
    }
-
-
-
-
-
-
-
-Drake                   Expires 15 November 2026               [Page 40]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
 
    The lookup response MUST NOT include hardware fingerprints, operator
    email, or other private data.  Private data is available only to the
@@ -2267,6 +2458,14 @@ Internet-Draft           Agent Identity Registry                May 2026
    section describes the functional roles such a framework would need to
    fill.
 
+
+
+
+Drake                   Expires 15 November 2026               [Page 44]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
    The governance authority SHOULD seek multi-stakeholder
    representation, which may include: technology providers (Registrars,
    Registry Operators, hardware manufacturers), relying parties
@@ -2290,14 +2489,6 @@ Internet-Draft           Agent Identity Registry                May 2026
       authority policies.  See Section 10.3.
 
    Hardware Trust Store Management  The governance authority curates the
-
-
-
-Drake                   Expires 15 November 2026               [Page 41]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
-
       Global Hardware Trust Store (see Section 4.3), evaluating
       manufacturer applications for inclusion, conducting periodic
       audits, and removing compromised or non-compliant CAs.
@@ -2323,6 +2514,14 @@ Internet-Draft           Agent Identity Registry                May 2026
    *  Operate the Global Hardware Fingerprint Index for its
       namespace(s), responding promptly to uniqueness queries.
 
+
+
+
+Drake                   Expires 15 November 2026               [Page 45]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
    *  Provide the AIRP interface to all accredited Registrars without
       discrimination.
 
@@ -2346,13 +2545,6 @@ Internet-Draft           Agent Identity Registry                May 2026
 
    *  Maintain the minimum data retention and privacy standards defined
       by the governance authority.
-
-
-
-Drake                   Expires 15 November 2026               [Page 42]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
 
    *  Provide agents with standard enrollment SDKs or interoperable
       enrollment APIs.
@@ -2379,10 +2571,18 @@ Internet-Draft           Agent Identity Registry                May 2026
    The OIDC tokens issued by Registrars are designed to integrate with
    emerging categories of agent communication protocols:
 
+
+
+Drake                   Expires 15 November 2026               [Page 46]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
    Tool Invocation Protocols  Agent identity tokens can serve as the
-      OAuth2 bearer token for tool invocation frameworks, enabling tool
-      servers to verify the calling agent's identity and trust tier
-      before granting access.
+      sender-constrained OAuth2 credential for tool invocation
+      frameworks, presented over mutual TLS or with a DPoP proof per
+      Section 7.4, enabling tool servers to verify the calling agent's
+      identity and trust tier before granting access.
 
    Agent Messaging Protocols  The agent-id URN can serve as the agent
       identifier in agent-to-agent messaging protocols, providing
@@ -2401,15 +2601,6 @@ Internet-Draft           Agent Identity Registry                May 2026
    standards:
 
    SPIFFE/SPIRE  SPIFFE workload identities identify software workloads;
-
-
-
-
-Drake                   Expires 15 November 2026               [Page 43]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
-
       agent identities identify autonomous entities.  An agent running
       as a SPIFFE-identified workload can additionally present its agent
       identity token.  The two are orthogonal.
@@ -2435,6 +2626,14 @@ Internet-Draft           Agent Identity Registry                May 2026
       CBOR-leaning EAT ecosystem, which is currently most heavily
       deployed via ARM's PSA Certified programme ([RFC9783]) for IoT
       devices.  AID claim names are chosen to be compatible with the EAT
+
+
+
+Drake                   Expires 15 November 2026               [Page 47]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
       claims registry where overlap exists; a future revision MAY define
       an EAT profile binding for environments where that alignment is
       preferred.
@@ -2458,14 +2657,6 @@ Internet-Draft           Agent Identity Registry                May 2026
       authenticate without human interaction, typically via OAuth2
       client-credentials grants rather than browser-mediated ceremonies.
       Where an agent operates on hardware that also supports FIDO2
-
-
-
-Drake                   Expires 15 November 2026               [Page 44]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
-
       authenticators (e.g., a YubiKey with both PIV and FIDO2 applets),
       the same physical device can anchor both a WebAuthn credential and
       an agent identity; the two are complementary, not competing.  This
@@ -2491,6 +2682,14 @@ Internet-Draft           Agent Identity Registry                May 2026
       controller dispatches missions, receives state updates, and
       coordinates traffic.
 
+
+
+
+Drake                   Expires 15 November 2026               [Page 48]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
    *  *Open-RMF* provides a multi-fleet coordination layer, enabling
       heterogeneous fleets from different vendors to share facilities,
       infrastructure (doors, lifts, charging stations), and task queues
@@ -2514,14 +2713,6 @@ Internet-Draft           Agent Identity Registry                May 2026
    assigned it.  When a robot is sold, transferred, redeployed, or
    presents itself to infrastructure it has never previously
    encountered, no existing standard provides a mechanism for the
-
-
-
-Drake                   Expires 15 November 2026               [Page 45]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
-
    receiving party to verify what that robot actually is, who
    manufactured it, whether its hardware and software stack have been
    tampered with, or whether it carries any certifications relevant to
@@ -2545,6 +2736,15 @@ Internet-Draft           Agent Identity Registry                May 2026
    *  Neither framework provides Sybil resistance: there is no mechanism
       that makes it economically or physically costly to present false
       identity claims at scale.
+
+
+
+
+
+Drake                   Expires 15 November 2026               [Page 49]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
 
    The Agent Identity Registry System (AIRS) is designed to sit below
    these fleet identity layers as a global hardware-anchored root of
@@ -2570,14 +2770,6 @@ Internet-Draft           Agent Identity Registry                May 2026
    *  When the robot is transferred, redeployed, or presents itself to a
       new facility or operator, the receiving party can verify the
       robot's AID URN against the AIRS registry, confirming manufacturer
-
-
-
-Drake                   Expires 15 November 2026               [Page 46]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
-
       provenance, trust tier, certification status, and that the
       hardware has not been substituted or cloned, without requiring any
       prior relationship with the deploying operator.
@@ -2602,6 +2794,14 @@ Internet-Draft           Agent Identity Registry                May 2026
    receiving operator cannot, in general, be expected to
    cryptographically inspect a newly delivered robot before accepting
    it; the social and logistical assumption is that delivered hardware
+
+
+
+Drake                   Expires 15 November 2026               [Page 50]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
    is legitimate.  This assumption is precisely the attack surface
    exploited by supply chain compromise, whether through counterfeit
    hardware, firmware implants introduced during shipping, or
@@ -2626,14 +2826,6 @@ Internet-Draft           Agent Identity Registry                May 2026
    attestation for its current software state against its enrolled TPM
    cannot be mistaken for a robot that can.  This capability complements
    existing TPM-backed measured boot and platform configuration register
-
-
-
-Drake                   Expires 15 November 2026               [Page 47]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
-
    (PCR) attestation as defined in [TCG-TPM2]; the AID provides the
    stable, externally-verifiable identity anchor against which those PCR
    measurements are bound and reported.
@@ -2654,6 +2846,17 @@ Internet-Draft           Agent Identity Registry                May 2026
    *  *Software certification binding:* confirmation that the software
       stack currently running on the robot is the certified and approved
       version, not a subsequent modification.
+
+
+
+
+
+
+
+Drake                   Expires 15 November 2026               [Page 51]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
 
    *  *Persistent audit trail:* an indelible record of the robot's
       identity, certifications, operational history, and any incidents
@@ -2678,18 +2881,6 @@ Internet-Draft           Agent Identity Registry                May 2026
    them at the perimeter using standard OAuth2/OIDC tooling, without
    custom integration per robot vendor or fleet management platform.
 
-
-
-
-
-
-
-
-Drake                   Expires 15 November 2026               [Page 48]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
-
 11.5.  Human-Readable Display Conventions
 
    When a relying party renders an agent's identity to a human, it
@@ -2711,6 +2902,17 @@ Internet-Draft           Agent Identity Registry                May 2026
    The URN MUST remain accessible as the authoritative reference (e.g.,
    via tooltip, detail pane, or adjacent text) and MUST be used in all
    machine-to-machine contexts, audit trails, and abuse reports.
+
+
+
+
+
+
+
+Drake                   Expires 15 November 2026               [Page 52]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
 
 12.  IANA Considerations
 
@@ -2739,13 +2941,6 @@ Internet-Draft           Agent Identity Registry                May 2026
    hardware-anchored identity systems, and the security properties
    described in this document.
 
-
-
-Drake                   Expires 15 November 2026               [Page 49]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
-
           +========+================================+===========+
           | Label  | Description                    | Reference |
           +========+================================+===========+
@@ -2764,6 +2959,16 @@ Internet-Draft           Agent Identity Registry                May 2026
    Operators MUST encrypt hardware fingerprints at rest using
    authenticated encryption and MUST implement access controls that
    limit fingerprint access to the hardware uniqueness check API.
+
+
+
+
+
+
+Drake                   Expires 15 November 2026               [Page 53]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
 
    Daily escrow snapshots (with hardware fingerprints encrypted to the
    governance authority's escrow key) ensure that a compromised Registry
@@ -2789,19 +2994,6 @@ Internet-Draft           Agent Identity Registry                May 2026
       (e.g., many identities from one operator with suspiciously similar
       behaviour or enrollment characteristics).
 
-
-
-
-
-
-
-
-
-Drake                   Expires 15 November 2026               [Page 50]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
-
 13.3.  Hardware Security
 
    The security of this system ultimately depends on the tamper
@@ -2821,6 +3013,19 @@ Internet-Draft           Agent Identity Registry                May 2026
    regardless of how its presenter's identity was originally
    established.
 
+
+
+
+
+
+
+
+
+Drake                   Expires 15 November 2026               [Page 54]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
    This specification therefore requires that all tokens issued for the
    sovereign, portable, and enclave trust tiers be sender-constrained
    through the Proof-of-Possession profile of Section 7.4.  Relying
@@ -2829,40 +3034,54 @@ Internet-Draft           Agent Identity Registry                May 2026
    Possession verification loses the hardware-anchoring guarantee at the
    moment of use.
 
-   A token-theft attack against a sovereign-tier agent therefore
-   requires one of the following: (a) physical compromise of the
-   enrolled hardware device (invasive extraction, side channel, supply-
-   chain interception), which belongs to the hardware vendor's threat
-   model and is out of scope for this specification; (b) resident
-   malware on the legitimate host that invokes the hardware signing API
-   on the attacker's behalf, which belongs to measured-boot, remote-
-   attestation, and endpoint-protection systems layered above this one
-   and is also out of scope; (c) compromise of the Registrar's signing
-   key, addressed in Section 13.5; or (d) deployment against a Relying
-   Party that does not enforce Proof-of-Possession.  The shorter token
-   lifetimes recommended in Section 7.1 bound the residual impact of
-   cases where Proof-of-Possession enforcement is incomplete.  Honestly
-   bounding the attack surface in this way -- rather than overclaiming
-   host integrity -- is itself a load-bearing property of this
-   specification: deployers SHOULD pair AID with host-integrity
+   When mutual TLS is used (Section 7.4.1), the combination of hardware-
+   backed client certificates, ephemeral session keys, and authenticated
+   encryption means that no information extractable from logs, backups,
+   network captures, or breach of either endpoint can be used to
+   recreate the session on a different connection or to impersonate
+   either party.  The session key is cryptographically bound to the
+   specific TLS handshake that produced it; it cannot be replayed,
+   transplanted, or reconstructed.
+
+   When DPoP is used (Section 7.4.2), the strengthened profile defined
+   in this specification ensures that a captured DPoP proof is similarly
+   useless: it is bound to a unique jti (non-replayable), a server nonce
+   (expired after consumption), a specific request-target including
+   query string, a specific body (via Content-Digest and cdh), and
+   specific header values (via cov and hvs).  An attacker in possession
+   of a complete captured request cannot replay it, cannot modify it,
+   and cannot redirect it to a different endpoint.
+
+   The residual attack surface under both mechanisms is limited to: (a)
+   physical compromise of the enrolled hardware device (invasive
+   extraction, side channel, supply-chain interception), which belongs
+   to the hardware vendor's threat model and is out of scope for this
+   specification; (b) resident malware on the legitimate host that can
+   invoke the hardware signing API on the attacker's behalf, which
+   belongs to measured-boot, remote-attestation, and endpoint-protection
+   systems layered above this one and is also out of scope; (c)
+   compromise of the Registrar's signing key, addressed in Section 13.5;
+   or (d) a fully compromised Relying Party application layer, which can
+   act arbitrarily regardless of transport security and is therefore out
+   of scope.  Honestly bounding the attack surface in this way -- rather
+   than overclaiming host integrity -- is itself a load-bearing property
+   of this specification: deployers SHOULD pair AID with host-integrity
    mechanisms (measured boot, runtime attestation, endpoint detection)
    for any context where resident malware is a credible threat.
-
-
-
-
-
-
-Drake                   Expires 15 November 2026               [Page 51]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
 
    The attested_trust_tier claim is bound to the token at issuance and
    reflects the device used for the most recent attestation.  If a
    hardware binding is revoked between token issuance and token expiry,
    any token already in circulation continues to verify until exp; this
    is the staleness window.  Relying Parties requiring fresh tier
+
+
+
+Drake                   Expires 15 November 2026               [Page 55]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
    evidence MUST require very short token lifetimes, MUST query the
    Issuer's introspection endpoint (Section 9.1) on each request, or
    MUST trigger a hardware-backed re-authentication.
@@ -2909,7 +3128,12 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 52]
+
+
+
+
+
+Drake                   Expires 15 November 2026               [Page 56]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -2965,7 +3189,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 53]
+Drake                   Expires 15 November 2026               [Page 57]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3021,7 +3245,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 54]
+Drake                   Expires 15 November 2026               [Page 58]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3077,7 +3301,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 55]
+Drake                   Expires 15 November 2026               [Page 59]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3133,7 +3357,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 56]
+Drake                   Expires 15 November 2026               [Page 60]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3160,15 +3384,39 @@ Internet-Draft           Agent Identity Registry                May 2026
               Indicators for OAuth 2.0", RFC 8707, DOI 10.17487/RFC8707,
               February 2020, <https://www.rfc-editor.org/info/rfc8707>.
 
+   [RFC9421]  Backman, A., Ed., Richer, J., Ed., and M. Sporny, "HTTP
+              Message Signatures", RFC 9421, DOI 10.17487/RFC9421,
+              February 2024, <https://www.rfc-editor.org/info/rfc9421>.
+
    [RFC9449]  Fett, D., Campbell, B., Bradley, J., Lodderstedt, T.,
               Jones, M., and D. Waite, "OAuth 2.0 Demonstrating Proof of
               Possession (DPoP)", RFC 9449, DOI 10.17487/RFC9449,
               September 2023, <https://www.rfc-editor.org/info/rfc9449>.
 
+   [RFC9530]  Polli, R. and L. Pardue, "Digest Fields", RFC 9530,
+              DOI 10.17487/RFC9530, February 2024,
+              <https://www.rfc-editor.org/info/rfc9530>.
+
+   [RFC9846]  Rescorla, E., "The Transport Layer Security (TLS) Protocol
+              Version 1.3", RFC 9846, DOI 10.17487/RFC9846, May 2026,
+              <https://www.rfc-editor.org/info/rfc9846>.
+
+   [RFC9963]  Benjamin, D. and A. Popov, "Legacy RSASSA-PKCS1-v1_5 Code
+              Points for TLS 1.3", RFC 9963, DOI 10.17487/RFC9963, April
+              2026, <https://www.rfc-editor.org/info/rfc9963>.
+
    [OIDC-Core]
               OpenID Foundation, "OpenID Connect Core 1.0", November
               2014,
               <https://openid.net/specs/openid-connect-core-1_0.html>.
+
+
+
+
+Drake                   Expires 15 November 2026               [Page 61]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
 
 17.  Informative References
 
@@ -3183,16 +3431,6 @@ Internet-Draft           Agent Identity Registry                May 2026
    [RFC7662]  Richer, J., Ed., "OAuth 2.0 Token Introspection",
               RFC 7662, DOI 10.17487/RFC7662, October 2015,
               <https://www.rfc-editor.org/info/rfc7662>.
-
-
-
-
-
-
-Drake                   Expires 15 November 2026               [Page 57]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
 
    [RFC7942]  Sheffer, Y. and A. Farrel, "Improving Awareness of Running
               Code: The Implementation Status Section", BCP 205,
@@ -3229,6 +3467,13 @@ Internet-Draft           Agent Identity Registry                May 2026
               Credentials Level 3", April 2025,
               <https://www.w3.org/TR/webauthn-3/>.
 
+
+
+Drake                   Expires 15 November 2026               [Page 62]
+
+Internet-Draft           Agent Identity Registry                May 2026
+
+
    [I-D.drake-email-hardware-attestation]
               Drake, C., "Hardware Attestation for Email Sender
               Verification", Work in Progress, Internet-Draft, draft-
@@ -3240,15 +3485,6 @@ Internet-Draft           Agent Identity Registry                May 2026
               TCG Revision 185, December 2024,
               <https://trustedcomputinggroup.org/resource/tpm-library-
               specification/>.
-
-
-
-
-
-Drake                   Expires 15 November 2026               [Page 58]
-
-Internet-Draft           Agent Identity Registry                May 2026
-
 
    [TCG-EK-PROFILE]
               Trusted Computing Group, "TCG EK Credential Profile for
@@ -3289,19 +3525,7 @@ Appendix A.  Appendix: DNS Registry Analogy
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-Drake                   Expires 15 November 2026               [Page 59]
+Drake                   Expires 15 November 2026               [Page 63]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3357,7 +3581,7 @@ Internet-Draft           Agent Identity Registry                May 2026
 
 
 
-Drake                   Expires 15 November 2026               [Page 60]
+Drake                   Expires 15 November 2026               [Page 64]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3413,7 +3637,7 @@ B.1.  Embodied Autonomous Entities (Robots)
 
 
 
-Drake                   Expires 15 November 2026               [Page 61]
+Drake                   Expires 15 November 2026               [Page 65]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3469,7 +3693,7 @@ B.4.  Inter-Species Identity Recognition
 
 
 
-Drake                   Expires 15 November 2026               [Page 62]
+Drake                   Expires 15 November 2026               [Page 66]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3525,7 +3749,7 @@ Appendix C.  Acknowledgements
 
 
 
-Drake                   Expires 15 November 2026               [Page 63]
+Drake                   Expires 15 November 2026               [Page 67]
 
 Internet-Draft           Agent Identity Registry                May 2026
 
@@ -3581,4 +3805,4 @@ Author's Address
 
 
 
-Drake                   Expires 15 November 2026               [Page 64]
+Drake                   Expires 15 November 2026               [Page 68]

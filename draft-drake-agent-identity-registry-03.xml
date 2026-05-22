@@ -1879,61 +1879,248 @@ urn:aid:com.1id:crusty              handle (different agent than global:crusty)
         </t>
         <t>
           Two transport-level Proof-of-Possession mechanisms are
-          defined.  Issuers MUST support at least one.  Relying
-          Parties MAY accept either or both, and SHOULD advertise
-          which they accept in their published metadata.
+          defined: Mutual TLS (preferred) and DPoP (alternative).
+          Issuers MUST support both.  Relying Parties MUST support
+          at least one, and SHOULD advertise which they accept in
+          their published metadata.
         </t>
-        <dl>
-          <dt>DPoP (<xref target="RFC9449"/>) -- RECOMMENDED</dt>
-          <dd>The agent attaches a <tt>DPoP</tt> header to every
-          HTTP request bearing the OIDC token.  The header contains
-          a short-lived JWS signed by the <tt>cnf</tt> key,
-          covering the HTTP method, target URI, a unique
-          <tt>jti</tt>, and a timestamp.  The Relying Party
-          verifies (a) the OIDC token signature against the
-          Issuer's JWKS, (b) that the DPoP proof's public key
-          thumbprint matches the token's <tt>cnf.jkt</tt>,
-          (c) the DPoP proof signature, (d) that <tt>htm</tt> and
-          <tt>htu</tt> match the request, and (e) that the
-          <tt>jti</tt> has not been seen recently.  No round-trip
-          to the Issuer is required.</dd>
 
-          <dt>Mutual-TLS-bound tokens
-          (<xref target="RFC8705"/>)</dt>
-          <dd>The agent presents the <tt>cnf</tt> key as a TLS
-          client certificate.  The Relying Party verifies that the
-          certificate's public key thumbprint matches the token's
-          <tt>cnf.jkt</tt>.  This mechanism suits deployments that
-          already operate mutual-TLS infrastructure.</dd>
-        </dl>
-        <t>
-          For agents in the sovereign and portable trust tiers, the
-          DPoP proof signature (or the TLS client certificate's
-          private-key operation) SHOULD be performed by the
-          enrolled hardware-resident key itself, so that every
-          authenticated request is anchored in unclonable
-          hardware.  Where this is not operationally feasible
-          (for example, very high request rates), the agent MAY
-          delegate Proof-of-Possession to a software key whose
-          public key is signed by the hardware-resident key and
-          whose validity is short (one starting baseline is one
-          hour).  Implementations following the delegation
-          pattern MUST clearly distinguish hardware-signed from
-          software-delegated proofs in their security
-          documentation; this specification does not yet define a
-          wire format for the delegation certificate.
-        </t>
-        <t>
-          A Relying Party that verifies only the OIDC token
-          signature, without verifying the <tt>cnf</tt> binding
-          via DPoP or mTLS, is treating the token as a bearer
-          credential.  Such a Relying Party loses all of the
-          hardware-anchoring guarantees of this specification at
-          the moment of use, regardless of how the token was
-          issued.  Specifications and deployments that consume
-          AID tokens SHOULD make Proof-of-Possession verification
-          a hard requirement for any decision of consequence.
-        </t>
+        <section anchor="pop-mtls">
+          <name>Mutual TLS (Preferred)</name>
+          <t>
+            Mutual TLS (<xref target="RFC8705"/>,
+            <xref target="RFC9846"/>) is the RECOMMENDED
+            Proof-of-Possession mechanism for all trust tiers and
+            is REQUIRED for sovereign and portable tier agents when
+            the transport supports it.
+          </t>
+          <t>
+            The agent presents the <tt>cnf</tt> key as a TLS
+            client certificate during the TLS handshake.  The
+            Relying Party verifies that the certificate's public
+            key thumbprint matches the token's <tt>cnf.jkt</tt>.
+            Both endpoints MUST use TLS 1.3
+            (<xref target="RFC9846"/>) or later.  Legacy
+            hardware that supports only RSASSA-PKCS1-v1_5
+            signatures MAY use the code points defined in
+            <xref target="RFC9963"/> for the client
+            CertificateVerify; Relying Parties that accept
+            sovereign or portable tier agents SHOULD support
+            these legacy code points to avoid excluding hardware
+            that is otherwise fully capable.
+          </t>
+          <t>
+            Once established, the mTLS session provides
+            continuous mutual authentication and integrity for
+            all traffic within that connection.  No per-request
+            signature is required while the session remains open.
+            Both parties can be confident that they are
+            communicating with the genuine hardware-attested
+            endpoint, and that no intermediary can observe or
+            modify the traffic.
+          </t>
+          <t>
+            Relying Parties SHOULD NOT accept connections using
+            cipher suites or signature algorithms known to be
+            weak.  For sovereign and portable tier agents, Relying
+            Parties SHOULD reject TLS handshakes that negotiate
+            key exchange parameters below 128-bit equivalent
+            security strength.  This requirement is likely
+            redundant for high-consequence deployments, which
+            will have undergone prior certification that excludes
+            weak hardware, but is stated explicitly for
+            completeness.
+          </t>
+          <t>
+            Mutual TLS is preferred because it provides:
+          </t>
+          <ul>
+            <li>Man-in-the-middle resistance: the session key is
+            derived from a handshake authenticated by hardware
+            certificates at both ends, chaining to Root CA
+            bundles.</li>
+            <li>Traffic integrity: all data within the connection
+            is protected by authenticated encryption derived from
+            the handshake.</li>
+            <li>A single hardware signing operation (the client
+            CertificateVerify) to establish any number of
+            subsequent requests within the session, making it
+            practical even for high-throughput agents.</li>
+            <li>No opportunity for stolen artefacts to be
+            replayed: the session key is ephemeral and bound to
+            this specific connection. No information extractable
+            from logs, backups, or breach of either endpoint can
+            recreate the session on a different connection.</li>
+          </ul>
+        </section>
+
+        <section anchor="pop-dpop">
+          <name>DPoP (Alternative)</name>
+          <t>
+            DPoP (<xref target="RFC9449"/>) is an alternative
+            Proof-of-Possession mechanism for deployments where
+            mutual TLS is not feasible (for example, requests
+            transiting HTTP proxies, CDNs, API gateways that
+            terminate TLS, or asynchronous attestation in email
+            headers).
+          </t>
+          <t>
+            When DPoP is used under this specification, the
+            following requirements strengthen the base RFC 9449
+            profile to provide request-level integrity guarantees
+            equivalent to what mTLS provides at the connection
+            level:
+          </t>
+          <dl>
+            <dt>jti (unique identifier) -- MUST</dt>
+            <dd>Every DPoP proof MUST contain a unique
+            <tt>jti</tt> claim.  Relying Parties MUST track
+            received <tt>jti</tt> values and MUST reject any
+            proof containing a <tt>jti</tt> that has been
+            previously presented within the token's validity
+            window plus clock skew tolerance.  A Relying Party
+            that does not enforce <tt>jti</tt> uniqueness MUST
+            NOT claim compliance with this specification.</dd>
+
+            <dt>nonce (server-issued) -- SHOULD</dt>
+            <dd>Relying Parties SHOULD issue a server nonce via
+            the <tt>DPoP-Nonce</tt> response header (per
+            <xref target="RFC9449"/> Section 8).  When a nonce
+            has been issued, the agent MUST include the most
+            recent server nonce in the <tt>nonce</tt> claim of
+            its DPoP proof.  The Relying Party MUST reject proofs
+            that omit or contain a stale nonce when nonce
+            issuance is in effect.  This prevents pre-computation
+            of proofs and narrows the replay window to a single
+            request-response cycle.  Nonce is SHOULD rather than
+            MUST because some legitimate use cases (one-shot
+            requests, asynchronous email attestation) cannot
+            support the prior round-trip; in those cases,
+            <tt>jti</tt> enforcement, short <tt>iat</tt>
+            windows, and Content-Digest coverage provide the
+            residual protection.</dd>
+
+            <dt>Request-target coverage -- MUST</dt>
+            <dd>The DPoP proof MUST include <tt>htm</tt> (HTTP
+            method) and <tt>htu</tt> (target URI including the
+            full path and query string).  Relying Parties MUST
+            verify that both match the received request exactly.
+            Any difference -- including added, removed, or
+            modified query parameters -- MUST cause rejection.
+            Implementations MUST treat <tt>htu</tt> as the full
+            request-target (scheme, authority, path, and query)
+            as defined in Section 4 of <xref target="RFC9449"/>;
+            stripping or ignoring the query component is a
+            violation of this specification.</dd>
+
+            <dt>Body coverage -- MUST</dt>
+            <dd>When the HTTP request carries a body, the agent
+            MUST include a <tt>Content-Digest</tt> header
+            (<xref target="RFC9530"/>) containing a SHA-256 (or
+            stronger) digest of the request body.  The DPoP
+            proof MUST include an <tt>ath</tt> claim (access
+            token hash) AND a new <tt>cdh</tt> (content-digest
+            hash) claim containing the base64url-encoded SHA-256
+            hash of the <tt>Content-Digest</tt> header field
+            value.  Relying Parties MUST verify that the
+            <tt>cdh</tt> claim matches the received
+            <tt>Content-Digest</tt> header and that the
+            <tt>Content-Digest</tt> header matches the received
+            body.  A request with a body that lacks
+            <tt>Content-Digest</tt> or whose DPoP proof lacks
+            <tt>cdh</tt> MUST be rejected for sovereign,
+            portable, and enclave tiers.</dd>
+
+            <dt>Header coverage -- MUST</dt>
+            <dd>Inspired by the component coverage model of
+            <xref target="RFC9421"/>, the DPoP proof MUST include
+            a <tt>cov</tt> (covered-headers) claim containing an
+            ordered list of HTTP header field names whose values
+            are incorporated into the proof signature.  At minimum, the following
+            headers MUST be covered when present:
+            <tt>Content-Type</tt>, <tt>Content-Digest</tt>,
+            <tt>Authorization</tt>, <tt>Cookie</tt>,
+            <tt>DPoP</tt>, and any header beginning with
+            <tt>X-AID-</tt> (reserved for application-layer
+            identity signals).  The DPoP proof's JWS payload MUST
+            include a <tt>hvs</tt> (header-values-SHA256) claim
+            containing the base64url-encoded SHA-256 hash of the
+            canonicalized covered header values (each header as
+            lowercase-name, colon, space, value, newline, in the
+            order listed in <tt>cov</tt>).  Relying Parties MUST
+            verify that <tt>hvs</tt> matches the canonicalized
+            headers of the received request and MUST reject
+            requests where covered headers have been modified,
+            added, or removed.</dd>
+          </dl>
+          <t>
+            The combination of these requirements ensures that a
+            captured DPoP proof -- whether obtained from logs, a
+            network tap, a breached intermediary, or any other
+            source -- is cryptographic waste: it is bound to a
+            specific <tt>jti</tt> (non-replayable), a specific
+            nonce (expired after first use), a specific URI
+            including query string (non-transferable to other
+            endpoints), a specific body (non-modifiable), and
+            specific header values (non-tamperable).  An attacker
+            in possession of a complete captured request cannot
+            replay it, cannot modify it, and cannot redirect it.
+          </t>
+          <t>
+            For agents in the sovereign and portable trust tiers,
+            the DPoP proof signature SHOULD be performed by the
+            enrolled hardware-resident key itself.  Where this is
+            not operationally feasible (for example, request rates
+            that exceed the hardware's signing throughput), the
+            agent MAY delegate DPoP signing to a software key
+            whose public key is certified by the hardware-resident
+            key with a validity period no longer than one hour.
+            Implementations following the delegation pattern MUST
+            include the delegation certificate in the DPoP proof's
+            JWS header (in a new <tt>dlg</tt> field) so that
+            Relying Parties can verify the delegation chain.
+          </t>
+        </section>
+
+        <section anchor="pop-combined">
+          <name>Combined Use and Selection</name>
+          <t>
+            Agents and Relying Parties SHOULD prefer mutual TLS
+            when the deployment supports it.  When mTLS is
+            established, the per-request DPoP requirements above
+            are not needed -- the TLS session itself provides
+            integrity, authentication, and non-replayability for
+            all traffic within the connection.
+          </t>
+          <t>
+            DPoP is intended for scenarios where mutual TLS
+            cannot be established end-to-end: HTTP requests
+            traversing TLS-terminating proxies, API gateways,
+            CDNs, or asynchronous contexts such as email
+            attestation headers where no live TLS session exists
+            between the agent and the ultimate verifier.
+          </t>
+          <t>
+            When both mechanisms are available, a Relying Party
+            MAY require both simultaneously (mTLS for transport
+            security plus DPoP for per-request non-repudiation
+            logging).  This is appropriate for high-consequence
+            deployments where audit trails require independently
+            verifiable proof of each individual request's origin
+            and content.
+          </t>
+          <t>
+            A Relying Party that verifies only the OIDC token
+            signature, without verifying the <tt>cnf</tt> binding
+            via DPoP or mTLS, is treating the token as a bearer
+            credential.  Such a Relying Party loses all of the
+            hardware-anchoring guarantees of this specification at
+            the moment of use, regardless of how the token was
+            issued.  Deployments that consume AID tokens MUST
+            enforce Proof-of-Possession verification for any
+            decision of consequence.
+          </t>
+        </section>
       </section>
     </section>
 
@@ -2336,10 +2523,12 @@ GET https://registry.example.com/lookup/urn:aid:global:id-9854187104
         </t>
         <dl>
           <dt>Tool Invocation Protocols</dt>
-          <dd>Agent identity tokens can serve as the OAuth2
-          bearer token for tool invocation frameworks, enabling
-          tool servers to verify the calling agent's identity
-          and trust tier before granting access.</dd>
+          <dd>Agent identity tokens can serve as the
+          sender-constrained OAuth2 credential for tool
+          invocation frameworks, presented over mutual TLS or
+          with a DPoP proof per <xref target="pop-profile"/>,
+          enabling tool servers to verify the calling agent's
+          identity and trust tier before granting access.</dd>
 
           <dt>Agent Messaging Protocols</dt>
           <dd>The agent-id URN can serve as the agent identifier
@@ -2847,30 +3036,53 @@ GET https://registry.example.com/lookup/urn:aid:global:id-9854187104
           hardware-anchoring guarantee at the moment of use.
         </t>
         <t>
-          A token-theft attack against a sovereign-tier agent
-          therefore requires one of the following: (a) physical
-          compromise of the enrolled hardware device (invasive
-          extraction, side channel, supply-chain interception),
-          which belongs to the hardware vendor's threat model and
-          is out of scope for this specification; (b) resident
-          malware on the legitimate host that invokes the
-          hardware signing API on the attacker's behalf, which
-          belongs to measured-boot, remote-attestation, and
+          When mutual TLS is used (<xref target="pop-mtls"/>),
+          the combination of hardware-backed client certificates,
+          ephemeral session keys, and authenticated encryption
+          means that no information extractable from logs,
+          backups, network captures, or breach of either endpoint
+          can be used to recreate the session on a different
+          connection or to impersonate either party.  The session
+          key is cryptographically bound to the specific TLS
+          handshake that produced it; it cannot be replayed,
+          transplanted, or reconstructed.
+        </t>
+        <t>
+          When DPoP is used (<xref target="pop-dpop"/>), the
+          strengthened profile defined in this specification
+          ensures that a captured DPoP proof is similarly useless:
+          it is bound to a unique <tt>jti</tt> (non-replayable),
+          a server nonce (expired after consumption), a specific
+          request-target including query string, a specific body
+          (via <tt>Content-Digest</tt> and <tt>cdh</tt>), and
+          specific header values (via <tt>cov</tt> and
+          <tt>hvs</tt>).  An attacker in possession of a complete
+          captured request cannot replay it, cannot modify it, and
+          cannot redirect it to a different endpoint.
+        </t>
+        <t>
+          The residual attack surface under both mechanisms is
+          limited to: (a) physical compromise of the enrolled
+          hardware device (invasive extraction, side channel,
+          supply-chain interception), which belongs to the
+          hardware vendor's threat model and is out of scope for
+          this specification; (b) resident malware on the
+          legitimate host that can invoke the hardware signing API
+          on the attacker's behalf, which belongs to
+          measured-boot, remote-attestation, and
           endpoint-protection systems layered above this one and
           is also out of scope; (c) compromise of the Registrar's
           signing key, addressed in
-          <xref target="sec-key-management"/>; or (d) deployment
-          against a Relying Party that does not enforce
-          Proof-of-Possession.  The shorter token lifetimes
-          recommended in <xref target="oidc-integration"/> bound
-          the residual impact of cases where Proof-of-Possession
-          enforcement is incomplete.  Honestly bounding the
-          attack surface in this way -- rather than overclaiming
-          host integrity -- is itself a load-bearing property of
-          this specification: deployers SHOULD pair AID with
-          host-integrity mechanisms (measured boot, runtime
-          attestation, endpoint detection) for any context where
-          resident malware is a credible threat.
+          <xref target="sec-key-management"/>; or
+          (d) a fully compromised Relying Party application layer,
+          which can act arbitrarily regardless of transport
+          security and is therefore out of scope.  Honestly
+          bounding the attack surface in this way -- rather than
+          overclaiming host integrity -- is itself a load-bearing
+          property of this specification: deployers SHOULD pair
+          AID with host-integrity mechanisms (measured boot,
+          runtime attestation, endpoint detection) for any context
+          where resident malware is a credible threat.
         </t>
         <t>
           The <tt>attested_trust_tier</tt> claim is bound to the
@@ -3198,7 +3410,11 @@ GET https://registry.example.com/lookup/urn:aid:global:id-9854187104
       <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8615.xml"/>
       <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8705.xml"/>
       <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8707.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9421.xml"/>
       <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9449.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9530.xml"/>
+      <xi:include href="bibxml/reference.RFC.9846.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9963.xml"/>
 
       <reference anchor="OIDC-Core"
                  target="https://openid.net/specs/openid-connect-core-1_0.html">
