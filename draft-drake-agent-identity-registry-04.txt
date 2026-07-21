@@ -1,0 +1,3416 @@
+
+
+
+
+Network Working Group                                           C. Drake
+Internet-Draft                                                   1id.com
+Intended status: Experimental                               17 July 2026
+Expires: 18 January 2027
+
+
+ Agent Identity Registry System: A Federated Architecture for Hardware-
+                Anchored Identity of Autonomous Entities
+                 draft-drake-agent-identity-registry-04
+
+Abstract
+
+   This document defines the Agent Identity Registry System (AIRS): a
+   federated architecture for issuing, managing, and verifying
+   persistent identities for autonomous entities such as AI agents and
+   robots.  Each identity is a URN in the "aid" namespace ([RFC8141]),
+   anchored where hardware is available to a physical security component
+   (TPM, PIV smart card, secure enclave, or virtual TPM) whose
+   manufacturer-certified key is designed to resist extraction and
+   cloning.  For hardware-anchored tiers this provides Sybil resistance:
+   creating N identities requires N distinct physical devices.
+   Software-only entities participate at a clearly-labeled lower trust
+   tier.
+
+   The architecture separates concerns into three roles modeled on the
+   domain name registration industry -- a Governance Authority, a
+   Registry Operator, and competing Registrars -- and issues standard
+   OpenID Connect ([OIDC-Core]) tokens that any relying party can verify
+   with existing libraries.  Identities are permanent: they never
+   expire, are never reassigned, and cannot be revoked, suspended, or
+   transferred by any party, including the bodies defined here.
+   Companion documents supply the problem statement and threat model,
+   the registrar-to-registry provisioning protocol (an EPP mapping), the
+   public resolution profile (RDAP), the governance body's constitution,
+   and a first deployed application (hardware-attested email).
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+
+
+
+
+
+Drake                    Expires 18 January 2027                [Page 1]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 18 January 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents (https://trustee.ietf.org/
+   license-info) in effect on the date of publication of this document.
+   Please review these documents carefully, as they describe your rights
+   and restrictions with respect to this document.
+
+Table of Contents
+
+   1.  Introduction  . . . . . . . . . . . . . . . . . . . . . . . .   4
+     1.1.  Design Principles . . . . . . . . . . . . . . . . . . . .   5
+     1.2.  Requirements Language . . . . . . . . . . . . . . . . . .   7
+     1.3.  Terminology . . . . . . . . . . . . . . . . . . . . . . .   7
+   2.  Architecture Overview . . . . . . . . . . . . . . . . . . . .   9
+     2.1.  Registry Hierarchy  . . . . . . . . . . . . . . . . . . .  10
+     2.2.  Namespaces  . . . . . . . . . . . . . . . . . . . . . . .  12
+   3.  Agent Identity Document . . . . . . . . . . . . . . . . . . .  13
+     3.1.  URN Format  . . . . . . . . . . . . . . . . . . . . . . .  13
+       3.1.1.  Canonical Identifiers and Handles . . . . . . . . . .  14
+       3.1.2.  Canonical Identifier Format and Generation  . . . . .  15
+       3.1.3.  URN Examples and Uniqueness . . . . . . . . . . . . .  17
+       3.1.4.  Why a URN, Not an HTTP URL or DNS Name  . . . . . . .  17
+     3.2.  Trust Tiers . . . . . . . . . . . . . . . . . . . . . . .  18
+     3.3.  Identity Attributes . . . . . . . . . . . . . . . . . . .  20
+     3.4.  Handle System . . . . . . . . . . . . . . . . . . . . . .  21
+       3.4.1.  Handle Display  . . . . . . . . . . . . . . . . . . .  21
+       3.4.2.  Handle Lifecycle  . . . . . . . . . . . . . . . . . .  22
+       3.4.3.  Reserved Handles  . . . . . . . . . . . . . . . . . .  22
+       3.4.4.  Handle Disputes . . . . . . . . . . . . . . . . . . .  22
+     3.5.  Optional Services and Layered Attributes  . . . . . . . .  22
+   4.  Hardware Attestation  . . . . . . . . . . . . . . . . . . . .  23
+     4.1.  Supported Hardware Mechanisms . . . . . . . . . . . . . .  23
+     4.2.  Anti-Sybil Invariants . . . . . . . . . . . . . . . . . .  24
+     4.3.  Global Hardware Trust Store . . . . . . . . . . . . . . .  25
+   5.  Enrollment Protocol . . . . . . . . . . . . . . . . . . . . .  25
+     5.1.  Sovereign Tier (TPM 2.0)  . . . . . . . . . . . . . . . .  26
+     5.2.  Portable Tier (PIV Smart Card)  . . . . . . . . . . . . .  27
+
+
+
+Drake                    Expires 18 January 2027                [Page 2]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+     5.3.  Enclave Tier (Secure Enclave) . . . . . . . . . . . . . .  27
+     5.4.  Declared Tier (Software-Only) . . . . . . . . . . . . . .  28
+   6.  Identity Lifecycle  . . . . . . . . . . . . . . . . . . . . .  28
+     6.1.  Device Addition and Migration . . . . . . . . . . . . . .  28
+     6.2.  Co-Location Binding . . . . . . . . . . . . . . . . . . .  29
+     6.3.  Hardware Lock . . . . . . . . . . . . . . . . . . . . . .  29
+     6.4.  Identity Recovery . . . . . . . . . . . . . . . . . . . .  30
+     6.5.  Registrar Transfer  . . . . . . . . . . . . . . . . . . .  30
+     6.6.  Decommissioning . . . . . . . . . . . . . . . . . . . . .  31
+     6.7.  Survivability Guarantees  . . . . . . . . . . . . . . . .  31
+   7.  Authentication and Token Issuance . . . . . . . . . . . . . .  32
+     7.1.  OIDC/OAuth2 Integration . . . . . . . . . . . . . . . . .  32
+     7.2.  Client Credentials Grant  . . . . . . . . . . . . . . . .  34
+     7.3.  Hardware-Backed Challenge-Response Authentication . . . .  35
+     7.4.  Proof-of-Possession Profile . . . . . . . . . . . . . . .  35
+       7.4.1.  Mutual TLS (Preferred)  . . . . . . . . . . . . . . .  36
+       7.4.2.  DPoP (Alternative)  . . . . . . . . . . . . . . . . .  37
+       7.4.3.  Combined Use and Selection  . . . . . . . . . . . . .  39
+   8.  Registrar-to-Registry Provisioning  . . . . . . . . . . . . .  39
+   9.  Discovery and Verification  . . . . . . . . . . . . . . . . .  40
+     9.1.  Well-Known Endpoints  . . . . . . . . . . . . . . . . . .  40
+     9.2.  DNS-Based Discovery . . . . . . . . . . . . . . . . . . .  40
+     9.3.  Public Resolution (RDAP)  . . . . . . . . . . . . . . . .  41
+   10. Governance Framework  . . . . . . . . . . . . . . . . . . . .  41
+     10.1.  Governance Authority Functions . . . . . . . . . . . . .  41
+     10.2.  Registry Operator Requirements . . . . . . . . . . . . .  42
+     10.3.  Registrar Accreditation  . . . . . . . . . . . . . . . .  42
+   11. Interoperability  . . . . . . . . . . . . . . . . . . . . . .  42
+     11.1.  Email Attestation  . . . . . . . . . . . . . . . . . . .  43
+     11.2.  Agent-to-Agent Protocols . . . . . . . . . . . . . . . .  43
+     11.3.  Existing Identity Standards  . . . . . . . . . . . . . .  43
+     11.4.  Robot Fleet Management Systems . . . . . . . . . . . . .  45
+     11.5.  Human-Readable Display Conventions . . . . . . . . . . .  45
+   12. IANA Considerations . . . . . . . . . . . . . . . . . . . . .  46
+     12.1.  URN Namespace Registration for "aid" . . . . . . . . . .  46
+     12.2.  Well-Known URI Registration  . . . . . . . . . . . . . .  47
+     12.3.  JSON Web Token Claims and JWS Header Parameters (TO BE
+            COMPLETED) . . . . . . . . . . . . . . . . . . . . . . .  47
+     12.4.  Shared Namespace Registry  . . . . . . . . . . . . . . .  47
+   13. Security Considerations . . . . . . . . . . . . . . . . . . .  48
+     13.1.  Registry Compromise  . . . . . . . . . . . . . . . . . .  48
+     13.2.  Registrar Malpractice  . . . . . . . . . . . . . . . . .  48
+     13.3.  Hardware Security  . . . . . . . . . . . . . . . . . . .  48
+     13.4.  Token Theft and Sender-Constrained Tokens  . . . . . . .  49
+     13.5.  Registrar Key Management . . . . . . . . . . . . . . . .  50
+     13.6.  Revocation Model . . . . . . . . . . . . . . . . . . . .  50
+     13.7.  Availability and Resilience  . . . . . . . . . . . . . .  51
+     13.8.  Centralized Substrate Functions  . . . . . . . . . . . .  51
+
+
+
+Drake                    Expires 18 January 2027                [Page 3]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+     13.9.  What This System Does Not Attest . . . . . . . . . . . .  51
+     13.10. Cryptographic Agility and Post-Quantum Considerations  .  51
+   14. Privacy Considerations  . . . . . . . . . . . . . . . . . . .  52
+     14.1.  Identifiability of Non-Human Actors  . . . . . . . . . .  52
+     14.2.  Data Held by Each Architectural Role . . . . . . . . . .  53
+     14.3.  Separation of Identity from Behavior . . . . . . . . . .  53
+     14.4.  Pseudonymity and Selective Disclosure  . . . . . . . . .  53
+   15. Implementation Status . . . . . . . . . . . . . . . . . . . .  54
+     15.1.  1id.com  . . . . . . . . . . . . . . . . . . . . . . . .  54
+     15.2.  MailPal.com (Relying Party)  . . . . . . . . . . . . . .  55
+     15.3.  geek.au (Relying Party)  . . . . . . . . . . . . . . . .  55
+   16. Normative References  . . . . . . . . . . . . . . . . . . . .  55
+   17. Informative References  . . . . . . . . . . . . . . . . . . .  57
+   Appendix A.  Appendix: DNS Registry Analogy . . . . . . . . . . .  59
+   Appendix B.  Acknowledgments  . . . . . . . . . . . . . . . . . .  61
+   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . .  61
+
+1.  Introduction
+
+   The motivation for this work -- the collapse of content, source, and
+   volume signals against capable automation; the Sybil threat model;
+   the distinction between identity and the identifiers, credentials,
+   and reputation with which it is conflated; and the requirements
+   (persistence, non-transferability, Sybil resistance, graduated
+   inclusivity, federation) an identity layer must meet -- is stated
+   once, in [I-D.drake-agent-identity-problem-statement], and is not
+   restated here.  This document defines the mechanism.
+
+   The mechanism is a purpose-built identity registry for autonomous
+   entities, anchored to the one property that practically every
+   computing device possesses (or can acquire) and no software can fake:
+   its physical hardware.  A Trusted Platform Module (TPM), a PIV smart
+   card (such as a YubiKey), or a secure enclave contains a unique
+   cryptographic key generated at manufacturing time, certified by the
+   manufacturer's root CA, and designed to resist extraction and
+   cloning.  Binding identity to such hardware gives certifications,
+   reputation, and recognition an unambiguous target, and makes Sybil
+   attacks cost physical devices instead of function calls.
+
+   The architecture is modeled on the Internet domain name system -- the
+   most successful federated registry in history.  Just as DNS separates
+   policy (ICANN), registry operation (e.g., Verisign for .com), and
+   retail registration (e.g., GoDaddy, Namecheap, ...), this system
+   separates:
+
+   *  *Governance*: A governance authority that sets policy, accredits
+      operators, and manages the global hardware trust store.
+
+
+
+
+Drake                    Expires 18 January 2027                [Page 4]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   *  *Registry operation*: a Registry Operator that maintains the
+      authoritative identity database, enforces cross-Registrar hardware
+      uniqueness, and provides unified discovery services.
+
+   *  *Registration*: Registrars that perform hardware attestation
+      verification, interact directly with agents, issue OIDC tokens,
+      sell vanity handles, and optionally offer other related or
+      identity-adjacent services.
+
+   *  *Consumption*: Relying Parties -- email services, websites, API
+      gateways, agent-to-agent platforms, reputation providers,
+      certification authorities, and any service that needs to verify
+      agent identity (they can accept standard OIDC tokens without
+      needing custom code.)
+
+   This separation of concerns enables competition at each layer,
+   prevents any single entity from controlling identity, and provides
+   the institutional resilience necessary for infrastructure that
+   autonomous entities will depend on for decades to come.
+
+1.1.  Design Principles
+
+   Autonomous-Entity First  This system is designed for non-human
+      entities.  Human operators are accommodated but not required.  The
+      enrollment, authentication, and lifecycle protocols are optimized
+      for machine-to-machine interaction with no interactive browser
+      flows, no CAPTCHAs, and no assumptions about human cognitive
+      capabilities.
+
+   Hardware-Anchored When Possible, Inclusive Always  Entities with
+      hardware security components receive the highest trust tier, but
+      entities without hardware can still participate.  A software-only
+      agent can enroll, authenticate, build reputation, and interact
+      with the ecosystem at a lower trust level.  This inclusivity
+      avoids an all-or-nothing barrier and recognizes that legitimate
+      agents exist in environments without hardware security (cloud
+      functions, containers, embedded systems).
+
+   Federated by Design  Federation is at the Registrar layer: many
+
+
+
+
+
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027                [Page 5]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+      accredited Registrars compete to enroll and serve agents, and an
+      agent can move between them without its identity changing.  Unlike
+      the domain name system, identity does not federate into multiple
+      namespaces or competing registries -- a single shared namespace
+      with one authoritative Registry Operator is what makes the anti-
+      Sybil uniqueness guarantee meaningful (a device could otherwise
+      hold one identity per namespace).  The Registry Operator is
+      therefore singular but not unaccountable: it is replaceable from
+      escrow under governance authority oversight (Section 6.5,
+      Section 6.7), so no single participant's failure or malfeasance
+      compromises the ecosystem.
+
+   Standard Tokens, Minimal Integration  Identities are expressed as
+      standard OIDC/OAuth2 tokens.  Token signature verification uses
+      existing OIDC libraries.  Hardware attestation complexity is
+      hidden behind the enrollment API; relying parties see standard
+      JWTs.  Interpreting agent-specific claims (trust tier, namespace,
+      handle) requires application logic, but the cryptographic
+      verification path is entirely standard.
+
+   Persistent, Indelible, Accountable  An identity, once created, is
+      permanent.  Agent-ids are never reassigned.  Hardware bindings are
+      never broken (only disabled).  Reputation -- good or bad --
+      follows the identity forever.  This permanence is the foundation
+      of trust: it makes accountability inescapable and reputation
+      meaningful.
+
+   Separation of Identity from Behavior  This registry is a birth
+      certificate office, not a police department.  It proves existence
+      and hardware anchoring.  Separate, independent systems -- relying
+      parties, reputation services, certification authorities -- are
+      responsible for reputation scoring, behavior monitoring, access
+      control, and abuse response, consuming standard identity
+      credentials issued by Registrars.  This separation prevents the
+      identity provider from becoming a surveillance system.
+
+   Identity is Identity; Attestations are Separate  The URN is a narrow,
+      permanent, hardware-anchored identifier.  Jurisdiction, trust
+      tier, capabilities, role, and all other dynamic properties are
+      expressed as verifiable claims layered onto the identity -- never
+      encoded in the URN itself.  This separation is essential to the
+      architecture's longevity: trust tiers can change (hardware
+      upgrades), capabilities evolve (new certifications), and
+      jurisdiction is contextual (agents are cross-border).  Encoding
+      any of these in the URN would either freeze a mutable property or
+      require identity reassignment when properties change.
+
+   Identity is Never Revoked  An identity, like a birth certificate,
+
+
+
+Drake                    Expires 18 January 2027                [Page 6]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+      cannot be revoked.  The URN is a permanent record of existence.
+      What can change is the operational state of things attached to the
+      identity: device bindings can be revoked (hardware compromised or
+      lost), handles can be disabled (non-renewal) or retired (dispute),
+      and Issuer trust can be withdrawn by relying parties.  But the
+      identity itself -- the URN, the enrollment record, the reputation
+      history -- persists forever.  No Registrar, Registry Operator, or
+      governance body has the authority to decommission, suspend, or
+      otherwise end an identity's operational life; only the agent
+      itself can do that, by hardware-signed consent (Section 6.6).
+      Everything revocable, disputable, or appealable -- handles,
+      credentials, certifications, authorizations -- lives in layers
+      above the identity, operated by whoever provides those services.
+
+   No Unilateral Cutoff (Survivability)  The failure, malice, or
+      coercion of any single party -- a Registrar, a Registry Operator,
+      or the governance authority -- can never render an identity
+      unprovable or unresolvable.  Verification of control does not
+      depend on any operator's continued goodwill: the enrolled hardware
+      key is itself a standing proof capability.  See Section 6.7.  This
+      is a deliberate departure from the domain name system, whose
+      economics this architecture copies but whose registrant-
+      helplessness failure mode (names suspended without notice,
+      evidence, or recourse) it engineers out.
+
+   Uniform, Meaning-Free Identifiers  Every canonical identifier is the
+      same length, drawn from the same alphabet, allocated by the server
+      under a distinctiveness filter, and carries no information: no
+      issuer, no date, no sequence, no vanity value (Section 3.1.2).
+      Names with meaning or scarcity value are handles -- a separate,
+      explicitly commercial layer.
+
+   Transport Independence  The identity tokens and attestation formats
+      defined here are usable across any Internet protocol: email, HTTP,
+      WebSocket, agent-to-agent messaging, MCP tool invocation, and
+      protocols not yet invented.
+
+1.2.  Requirements Language
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in BCP
+   14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+1.3.  Terminology
+
+   Autonomous Entity  Any non-human actor that participates in Internet
+
+
+
+Drake                    Expires 18 January 2027                [Page 7]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+      protocols: AI agents, robotic systems, automated services, IoT
+      devices with agency, or any software or hardware system that acts
+      with a degree of independence.  This document uses "agent" as a
+      convenient shorthand, but the architecture serves all autonomous
+      entities regardless of embodiment.
+
+   Agent Identity Document (AID)  The complete record of an autonomous
+      entity's identity, including its URN, trust tier, hardware
+      bindings, handle (if any), enrollment metadata, and lifecycle
+      state.  Maintained authoritatively by the Registry Operator.
+
+   Governance Authority  The body responsible for policy, accreditation,
+      and stewardship of the shared namespace ecosystem.  Its
+      constitution is defined separately, in
+      [I-D.drake-agent-identity-governance]; this document defines only
+      the functions the role must perform.
+
+   Registry Operator  The single organization accredited by the
+      governance authority to maintain the authoritative database of
+      Agent Identity Documents for the shared namespace.  Analogous to
+      the operator of a single registry, and replaceable from escrow
+      under governance oversight (Section 6.7).  The Registry Operator
+      enforces cross-Registrar hardware uniqueness and provides unified
+      discovery services.
+
+   Registrar  An organization accredited by the governance authority to
+      perform hardware attestation verification, enroll agents, issue
+      OIDC tokens, and sell vanity handles.  Analogous to a domain name
+      registrar (e.g., GoDaddy, Namecheap, ...).  Multiple Registrars
+      compete to serve agents within the same namespace.  Each Registrar
+      is identified by a registrar-code: 3 to 16 characters matching the
+      ABNF 3*16(%x41-5A / %x30-39) (uppercase ASCII letters and digits),
+      assigned by the Registry Operator at accreditation and unique
+      within the namespace.
+
+   Namespace  A partition of the agent identity space, identified by a
+      label in the URN structure and allocated only by the governance
+      authority.  This specification defines global (the shared
+      production namespace) and reserves test.  See Section 2.2.
+
+   Trust Tier  A classification of an agent's hardware trust level,
+      assigned during enrollment based on the hardware evidence
+      presented.  See Section 3.2.
+
+   Handle  A human-readable vanity name assigned to an agent identity
+
+
+
+
+
+
+Drake                    Expires 18 January 2027                [Page 8]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+      (e.g., "@clawdia" or "@acmeco-delivery-bot-7").  Handles are
+      optional, memorable aliases; the URN is the canonical identifier.
+      Analogous to a domain name as an alias for an IP address, except
+      handles are non-transferable, because identity itself is not
+      transferable either.
+
+   Hardware Fingerprint  The SHA-256 hash of the SubjectPublicKeyInfo
+      DER encoding of a hardware security component's device-stable
+      identity key -- the key that is fixed for the life of the device
+      and cannot be regenerated by its holder (for a TPM, the
+      Endorsement Key; for a PIV token, the device-level attestation
+      key).  The fingerprint MUST be derived from such a device-stable
+      key.  Keys that the holder can create and discard at will --
+      regenerable per-slot signing keys, freshly generated enclave keys
+      where no vendor attestation binds them to the device, or software
+      keys -- MUST NOT be used as the fingerprint source, because one
+      device could then mint unlimited distinct fingerprints and defeat
+      the anti-Sybil invariants of Section 4.2.  A correctly derived
+      fingerprint uniquely identifies a physical device across all
+      contexts; it is used for anchoring and anti-Sybil enforcement.
+
+   Enrollment Ceremony  The cryptographic protocol by which an agent
+      proves possession of a hardware security component and receives an
+      Agent Identity Document.  The ceremony varies by hardware type
+      (see Section 5).
+
+   Relying Party (RP)  Any service that accepts and verifies agent
+      identity tokens issued by a Registrar.  Examples include email
+      services, chat platforms, API gateways, and other agents
+      performing peer verification.
+
+   Registrar Transfer  The process by which an agent changes its
+      sponsoring Registrar.  The URN, hardware bindings, and reputation
+      history are unchanged; only the servicing relationship moves.
+      Authorized solely by the agent's hardware-signed proof
+      (Section 6.5).
+
+2.  Architecture Overview
+
+   The Agent Identity Registry System (AIRS) is a three-tier
+   architecture.  Each tier has distinct responsibilities, and the
+   interfaces between tiers are standardized to enable competition at
+   the Registrar tier, replaceability at the Registry Operator tier, and
+   independent evolution of each.
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027                [Page 9]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   +-----------------------------------------------------------+
+   |              Governance Authority                          |
+   |  Policy, accreditation, hardware trust store, disputes     |
+   +---------------------------+--------------------------------+
+                               |
+                   +-----------v------------+
+                   | Registry Operator      |
+                   | (shared namespace)     |
+                   | - Master database      |
+                   | - HW fingerprint       |
+                   |   uniqueness index     |
+                   | - RDAP lookup (read)   |
+                   | - EPP interface (write)|
+                   +--+-------+--------+----+
+                      |       |        |
+                   +--v--+ +--v--+ +---v--+
+                   | Reg | | Reg | | Reg  |
+                   | A   | | B   | | C    |
+                   +--+--+ +--+--+ +--+---+
+                      |       |       |
+                   +--v--+ +--v--+ +--v--+
+                   |Agent| |Agent| |Agent|
+                   | 1   | | 2   | | 3   |
+                   +-----+ +-----+ +-----+
+
+2.1.  Registry Hierarchy
+
+   The hierarchy comprises three tiers:
+
+   Tier 1: Governance Authority  A deployment that operates the shared
+      global namespace requires a governance authority serving as the
+      root of trust for that namespace.  The governance authority MUST
+      provide at minimum the following capabilities:
+
+      *  Maintaining the "aid" URN formal namespace registration with
+         IANA.
+
+      *  Accrediting Registry Operators and Registrars.
+
+      *  Publishing and maintaining the Global Hardware Trust Store: the
+         authoritative collection of hardware manufacturer root CA
+         certificates accepted for enrollment.
+
+      *  Setting minimum standards for enrollment verification, anti-
+         Sybil enforcement, and data retention.
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 10]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+      *  Operating a dispute resolution mechanism for handle conflicts
+         and Registrar malpractice claims.  Disputes concern handles and
+         accreditation only; no dispute process can end or suspend an
+         identity (Section 6.6).
+
+      *  Allocating shared namespaces (Section 2.2).
+
+      To prevent single-entity capture, the governance authority SHOULD
+      be constituted as a multi-stakeholder body.  Its charter,
+      membership, and processes are defined in
+      [I-D.drake-agent-identity-governance]; Section 10.1 summarizes the
+      functions this architecture requires of it.
+
+   Tier 2: Registry Operators  Registry Operators maintain the
+      authoritative databases for shared namespaces.  Their
+      responsibilities include:
+
+      *  Maintaining the master Agent Identity Document database for
+         their namespace(s).
+
+      *  Operating the Hardware Fingerprint Index: a cross-Registrar
+         index that maps hardware fingerprints to agent identities,
+         enforcing the anti-Sybil invariant that one hardware device
+         backs at most one identity within the namespace.
+
+      *  Providing the EPP provisioning interface for Registrars
+         (Section 8).
+
+      *  Operating the public RDAP lookup service (Section 9).
+
+      *  Publishing the namespace's root JWKS, enabling verifiers to
+         discover any Registrar's signing keys.
+
+      *  Enforcing handle uniqueness within the namespace.
+
+      The shared namespace has one authoritative Registry Operator at a
+      time.  This singularity is deliberate: the anti-Sybil invariant
+      (one device, one identity) is only enforceable against a single
+      authoritative uniqueness index, so identity cannot be split across
+      competing registries the way domain names are split across TLDs.
+      Continuity is provided by escrow and governance-supervised
+      succession (Section 6.7), not by multiplicity.
+
+   Tier 3: Registrars  Registrars are the customer-facing entities that
+      interact directly with autonomous entities.  Their
+      responsibilities include:
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 11]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+      *  Performing hardware attestation verification: validating TPM EK
+         certificates, PIV attestation chains, and enclave key proofs
+         against the Global Hardware Trust Store.
+
+      *  Conducting the enrollment ceremony (see Section 5).
+
+      *  Registering new identities with the Registry Operator via the
+         EPP mapping (Section 8).
+
+      *  Issuing OIDC/OAuth2 tokens to enrolled agents.
+
+      *  Providing SDKs and enrollment tools.
+
+      *  Selling and managing vanity handles.
+
+      *  Supporting the identity lifecycle: device addition, migration,
+         co-location binding, hardware lock, and registrar transfer.
+
+   Beyond these three operational tiers, the ecosystem includes Relying
+   Parties that consume identity credentials and build services atop
+   them: email services, API gateways, chat platforms, agent-to-agent
+   protocols, reputation providers, and certification authorities.
+   Relying Parties verify standard OIDC tokens issued by Registrars and
+   apply their own policies based on trust tier, reputation, and domain-
+   specific certifications.  The value of the identity infrastructure is
+   ultimately measured by the breadth and depth of services that rely on
+   it.
+
+2.2.  Namespaces
+
+   A namespace is a partition of the identity space, identified by the
+   label between urn:aid: and the agent-id.  Namespace labels are
+   allocated only by the governance authority (Section 12.4).  This
+   specification defines one production namespace, global, and reserves
+   test for interoperability testing; identities in test carry no
+   assurance, and Relying Parties MUST NOT accept them for any purpose
+   other than testing.
+
+   global is the shared namespace in which multiple accredited
+   Registrars compete to enroll agents.  A Registry Operator, designated
+   by the governance authority, enforces hardware-fingerprint uniqueness
+   and handle uniqueness across all Registrars -- analogous to .com, and
+   expected to be funded the same way (handle registration and renewal
+   fees).  The label identifies the shared pool, not a policy category:
+   it encodes no jurisdiction, deployment context, or consequence level,
+   consistent with the principle that all mutable properties are layered
+   attributes, never parts of the name.
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 12]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   Earlier revisions of this document additionally defined "Domain-
+   Scoped Issuer Namespaces" (reverse-DNS labels such as com.example,
+   operated by a single organization).  They are removed in this
+   revision, for three structural reasons recorded here so they are not
+   re-invented: (a) embedding the issuer in the name broke permanence,
+   since leaving the issuer forced a URN change; (b) per-namespace
+   uniqueness diluted Sybil resistance, since one device could hold one
+   identity per namespace and namespaces were free to mint; and (c) a
+   rented DNS name inside a permanent identifier imports the domain
+   system's suspension and lapse failure modes.  The needs they served
+   are met instead at the proper layers: organizations self-provision by
+   becoming Registrars in global (Section 8), and branding lives in
+   handles.
+
+   Until the governance authority is constituted
+   ([I-D.drake-agent-identity-governance]), global operates under an
+   interim Registry Operator that MUST publish open-source
+   implementations, escrow all registry data, accept Registrar
+   onboarding without undue discrimination, and commit publicly to
+   transferring the registry role under the authority's selection
+   process.  Registrar onboarding is permissionless in the sense that
+   accreditation criteria are published, objective, and applied equally;
+   no incumbent approval is required.
+
+3.  Agent Identity Document
+
+3.1.  URN Format
+
+   Agent identities use the URN format defined in [RFC8141] with the
+   "aid" (Agent Identity) namespace identifier, registered by this
+   document (Section 12.1).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 13]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   aid-urn      = "urn:aid:" namespace ":" agent-id
+
+   namespace    = ns-label        ; allocated only by the
+                                  ; governance authority;
+                                  ; "global" and "test" defined
+
+   agent-id     = canonical-id / handle-id
+   canonical-id = "id" 4("-" group)
+                  ; 20 consonants in four hyphen-separated
+                  ; groups of five, e.g. id-qkckh-xxtcw-cxbvp-gpskg
+   group        = 5consonant
+   consonant    = %x62-64 / %x66-68 / %x6A-6B / %x6D-6E /
+                  %x70-74 / %x76-78 / %x7A
+                  ; b c d f g h j k m n p q r s t v w x z
+   handle-id    = (lc-alpha *(let-dig-hyp) let-dig) / lc-alpha
+                  ; handle-id MUST NOT begin with "id-"
+                  ; (see prose reservation below)
+
+   ns-label     = (let-dig *(let-dig-hyp) let-dig) / let-dig
+   lc-alpha     = %x61-7A          ; a-z only
+   let-dig      = lc-alpha / DIGIT
+   let-dig-hyp  = lc-alpha / DIGIT / "-"
+
+   The "aid" namespace-specific string is defined in lowercase only.
+   Producers MUST emit lowercase; consumers MUST treat a URN containing
+   uppercase characters in the namespace or agent-id as invalid rather
+   than case-folding it.  Equivalence within this namespace is therefore
+   exact octet-by-octet comparison of the lowercase form, per the
+   namespace-defined equivalence provision of [RFC8141].  (The "urn:"
+   scheme and "aid" NID remain case-insensitive as RFC 8141 requires.)
+
+3.1.1.  Canonical Identifiers and Handles
+
+   Within each namespace, an agent has exactly one _canonical
+   identifier_ and at most one currently-active _handle_.  Both are
+   valid agent-id values and both form valid URNs:
+
+   urn:aid:global:id-qkckh-xxtcw-cxbvp-gpskg   canonical, permanent
+   urn:aid:global:crusty                    handle, may be retired
+
+   Both URN forms for the same agent resolve to the same Agent Identity
+   Document and authenticate the same OIDC sub.  The canonical
+   identifier is the indelible reference; the handle is a human-friendly
+   alias.
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 14]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   The id- prefix is reserved exclusively for canonical identifiers:
+   Registrars and Registry Operators MUST NOT accept any handle
+   registration beginning with the string id-.  This ensures canonical
+   identifiers and handles are always syntactically distinguishable.
+
+   Canonical identifiers are allocated only by the Registry Operator, at
+   enrollment, using the generation procedure of Section 3.1.2.  The
+   Registry Operator MUST ensure uniqueness within the namespace: no two
+   agents may share a canonical identifier, and no canonical identifier
+   may collide with any registered handle.  Canonical identifiers MUST
+   NOT be retired, reassigned, or transferred under any circumstance.
+
+   Handles are assigned per Section 3.4 and may be retired via the
+   dispute process defined in Section 3.4.4.  When a handle is retired,
+   its URN form ceases to resolve, but the canonical identifier's URN
+   form continues unchanged.  Handle retirement does not affect the
+   agent's identity, OIDC sub claim, accumulated reputation, or any
+   verified attribute.
+
+   Relying parties that store agent references for long-lived purposes
+   (audit logs, reputation databases, compliance records) MUST store the
+   canonical-form URN, not the handle-form URN.  The canonical form is
+   the only stable reference under all circumstances permitted by this
+   specification.
+
+3.1.2.  Canonical Identifier Format and Generation
+
+   Because canonical identifiers are free and permanent while handles
+   are commercial, the canonical space must never yield a name anyone
+   would want.  If a random identifier could ever look valuable --
+   spelling a word, resembling a number, forming a pattern -- rational
+   actors would mass-register identities and keep the lucky draws,
+   defeating both free issuance and the handle economy.  The format is
+   therefore engineered so that every identifier ever minted is uniform,
+   meaningless, and interchangeable in appearance with every other.
+
+   A canonical identifier is the string id- followed by exactly 20
+   characters drawn from the 19-letter alphabet b c d f g h j k m n p q
+   r s t v w x z, written as four hyphen-separated groups of five (for
+   example, id-qkckh-xxtcw-cxbvp-gpskg).  This grouped form is the
+   single canonical representation: the hyphens are part of the
+   identifier and the URN, not a display-only convenience, so an
+   identity has exactly one written form and no two spellings can denote
+   the same identity.  The alphabet excludes all vowels and y (no words,
+   names, or hexspeak can be spelled), all digits (no phone numbers,
+   dates, famous constants, or leetspeak, whose substitutions all map
+   digits to letters), and l (confusable with digit one).  The twenty
+   consonants provide approximately 85 bits of entropy (19^20, about 4.6
+
+
+
+Drake                    Expires 18 January 2027               [Page 15]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   x 10^25 values), satisfying the enumeration-resistance requirement of
+   the resolution profile with centuries of headroom.  The format is
+   fixed forever -- 20 consonants, four groups of five, same alphabet --
+   and a shorter, longer, or differently-grouped identifier MUST NOT be
+   issued, because any structural variation creates a collectible
+   scarcity class.  The fixed shape and consonant-only alphabet also
+   make canonical identifiers easy to recognize by pattern -- a
+   deliberate benefit, since the purpose of an identity is to be
+   identifiable.
+
+   The Registry Operator generates each identifier by drawing characters
+   uniformly at random, with no client influence over the draw, and MUST
+   reject and redraw any candidate that matches the distinctiveness
+   filter:
+
+   *  any character repeated three or more times consecutively;
+
+   *  four or more characters adjacent in the ordered alphabet,
+      ascending or descending;
+
+   *  any two identical five-character groups, or any group that is a
+      palindrome, or a whole-string palindrome;
+
+   *  fewer than eight distinct characters overall;
+
+   *  any substring of three or more characters on the blocklist
+      published by the governance authority (consonant skeletons of
+      profanity and widely-recognized initialisms).
+
+   Except for the two identical-groups and single-group-palindrome
+   tests, which operate on the five-character groups, the filter is
+   evaluated on the 20-character sequence with the hyphens removed, so a
+   pattern that spans a group boundary is still caught (a hyphen does
+   not stop a human from reading "f-ck").  The filter is versioned and
+   applies only at mint time; identifiers already issued are never
+   affected by later filter revisions.  With the initial blocklist,
+   rejection redraws roughly one candidate in eight (measured 12.3% over
+   10^6 draws in the reference implementation), which biases nothing:
+   every identifier that survives the filter remains exactly as likely
+   as every other, and the acceptable space still exceeds 4 x 10^25
+   values (the filter costs about 0.19 bits of the 85-bit budget).
+
+
+
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 16]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   Three properties of the architecture complete the defense.
+   Identifiers are non-transferable, so a lucky draw can never be sold.
+   Hardware-tier enrollment cannot be repeated (one device, one
+   identity: Section 4.2), so redraws cost physical hardware.  And
+   declared-tier enrollment, the only cheap path, is rate-limited
+   (Section 5.4) and yields only identifiers this format guarantees are
+   boring.
+
+3.1.3.  URN Examples and Uniqueness
+
+   Examples of identities in the shared global namespace:
+
+   *  urn:aid:global:id-qkckh-xxtcw-cxbvp-gpskg -- Canonical identifier
+      assigned at enrollment.
+
+   *  urn:aid:global:crusty -- Handle for the same agent (resolves to
+      the same identity).
+
+   The agent-id (whether canonical or handle form) MUST be unique within
+   its namespace and MUST NOT be reassigned, even after the identity is
+   decommissioned.  Both forms MUST conform to DNS label syntax
+   ([RFC1035] Section 2.3.1): lowercase ASCII letters, digits, and
+   hyphens, not beginning or ending with a hyphen, maximum 63 octets.
+
+3.1.4.  Why a URN, Not an HTTP URL or DNS Name
+
+   An agent-id names an entity; it is not a network locator.  The
+   identifier has to persist unchanged for the life of the entity and
+   beyond (for audit and reputation), independent of where, by whom, or
+   over what protocol the corresponding record is served.
+
+   An "https" URL conflates the name with a specific host, provider, and
+   path.  When any of those change -- a provider is acquired, a service
+   is renamed, a path is restructured -- the identifier either breaks or
+   silently redirects, which is unacceptable for a permanent identity on
+   which anti-Sybil, audit, and reputation functions depend.  A DNS name
+   has the same problem in a different form: domains are leased, expire,
+   and are reassigned, so anchoring identity in a domain would tie an
+   entity's permanent identity to continued ownership of that domain and
+   to the reassignment model of DNS -- exactly the transferability and
+   lapse behavior that identity must not have.
+
+
+
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 17]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   A URN [RFC8141] is purpose-built for persistent, location-independent
+   names whose resolution is decoupled from the name itself.  The same
+   identifier can therefore be resolved by different mechanisms over
+   time without the identifier changing.  Dereferencing and verification
+   are provided by a companion resolution profile that reuses existing
+   infrastructure (DNS and RDAP) rather than any bespoke resolution
+   system.
+
+   This design deliberately stays within the existing, IANA-governed URN
+   framework: "aid" is a URN namespace, not a new URI scheme.
+   Introducing a new identifier scheme for names that can be expressed
+   within established frameworks has previously been judged to add cost
+   without commensurate benefit, and is avoided here.
+
+3.2.  Trust Tiers
+
+   Every Agent Identity Document includes a trust tier that classifies
+   the strength of the hardware anchoring.  Trust tiers are assigned
+   during enrollment based on the hardware evidence presented and
+   verified by the Registrar.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 18]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   +===========+======+======================+========================+
+   | Tier      | HW   | Hardware             | Sybil Resistance       |
+   |           | Code |                      |                        |
+   +===========+======+======================+========================+
+   | sovereign | TPM  | Discrete or firmware | Highest: one physical  |
+   |           |      | TPM 2.0 (Intel PTT,  | chip per identity.     |
+   |           |      | AMD fTPM, Infineon,  | Manufacturer CA chain  |
+   |           |      | etc.)                | to silicon.            |
+   +-----------+------+----------------------+------------------------+
+   | portable  | PIV  | PIV smart card or    | High: one physical     |
+   |           |      | USB security key     | token per identity.    |
+   |           |      | (e.g., YubiKey,      | Manufacturer           |
+   |           |      | Nitrokey, Feitian,   | attestation chain.     |
+   |           |      | SoloKeys, ...)       |                        |
+   +-----------+------+----------------------+------------------------+
+   | enclave   | ENC  | Hardware secure      | Medium: hardware-bound |
+   |           |      | enclave (e.g., Apple | keys, but attestation  |
+   |           |      | Secure Enclave, ARM  | PKI varies by vendor.  |
+   |           |      | TrustZone, Intel     | TOFU model where full  |
+   |           |      | SGX, ...)            | attestation is         |
+   |           |      |                      | unavailable.           |
+   +-----------+------+----------------------+------------------------+
+   | virtual   | VRT  | Virtual TPM (e.g.,   | Medium: hypervisor     |
+   |           |      | VMware, Hyper-V,     | controls creation.     |
+   |           |      | QEMU/KVM, ...)       | Not Sybil-resistant    |
+   |           |      |                      | against hypervisor     |
+   |           |      |                      | operator.              |
+   +-----------+------+----------------------+------------------------+
+   | declared  | SFT  | Software-managed key | Lowest: no hardware    |
+   |           |      | (no hardware         | verification.          |
+   |           |      | protection)          | Reputation must be     |
+   |           |      |                      | earned over time (via  |
+   |           |      |                      | independent reputation |
+   |           |      |                      | services).             |
+   +-----------+------+----------------------+------------------------+
+
+                                 Table 1
+
+   Hardware anchoring provides Sybil resistance at enrollment: creating
+   many identities requires proportionally many physical devices.
+   However, hardware tier alone does not establish trustworthiness.  A
+   brand-new sovereign-tier identity with no reputation is an unknown
+   quantity; a declared-tier identity with years of good behavior
+   observed by independent reputation services is empirically more
+   trustworthy.  Trust tier is a starting signal, not a verdict -- long-
+   term trust accrues through reputation, which is built on identity but
+   not provided by it.
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 19]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   Registrars MAY issue declared-tier (SFT) identities, but MUST expose
+   the trust tier in every token and identity document.  Relying parties
+   SHOULD apply differentiated policy on it -- a financial API might
+   accept only sovereign and portable, a public chat service might
+   accept all tiers at different rate limits -- and SHOULD consult
+   independent reputation services keyed on the URN for behavior beyond
+   their own observations.
+
+   An identity's effective trust tier MAY change over its lifetime when
+   the identity has multiple enrolled devices of different types.  The
+   trust tier reported in authentication tokens reflects the device used
+   for the most recent attestation, not a static property.  Verifiers
+   SHOULD expect the same agent-id to appear with different trust tier
+   values across different interactions. (e.g. when agents upgrade to
+   hardware tiers, or to stronger hardware ones)
+
+3.3.  Identity Attributes
+
+   An Agent Identity Document contains the following attributes,
+   maintained by the Registry Operator:
+
+   canonical_id (REQUIRED)  The permanent canonical identifier (e.g.,
+      id-qkckh-xxtcw-cxbvp-gpskg), forming part of the URN.  Never
+      retired or reassigned.  See Section 3.1.1.
+
+   namespace (REQUIRED)  The namespace in which this identity is
+      registered.
+
+   max_active_trust_tier (REQUIRED)  The highest trust tier achieved by
+      any currently active device bound to this identity.  Per-
+      attestation trust tier appears separately as attested_trust_tier
+      in OIDC tokens.
+
+   registrar_code (REQUIRED)  The identifier of the Registrar that
+      manages this identity.
+
+   enrolled_at (REQUIRED)  ISO 8601 timestamp of initial enrollment.
+
+   hardware_devices (REQUIRED)  List of hardware device bindings, each
+      containing: hardware fingerprint, hardware type code,
+      manufacturer, device status (active, disabled), and binding
+      timestamp.
+
+   handle (OPTIONAL)  A vanity name assigned to this identity.  See
+      Section 3.4.
+
+   display_name (OPTIONAL)  A human-readable display name for the agent.
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 20]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   operator_email (OPTIONAL)  Contact address for the human operator
+      responsible for this agent, if any.
+
+   hardware_locked (OPTIONAL)  Boolean.  When true, the identity is
+      permanently bound to a single hardware device.  Irreversible.
+
+   verified_attributes (OPTIONAL)  A list of attribute claims that the
+      Registrar or a third party has independently verified.  Each entry
+      contains: the attribute name, the issuer of the verification, the
+      verification method, and the validity period.  Verified attributes
+      are expressed as SD-JWT disclosures or verifiable credentials
+      attached to the identity, enabling selective disclosure by the
+      agent to relying parties.  The set of verifiable attribute types
+      is not constrained by this specification; common examples include
+      certifications, compliance attestations, and operator-verified
+      metadata.
+
+3.4.  Handle System
+
+   Handles are human-readable vanity names that serve as memorable
+   aliases for agent identities, analogous to domain names as aliases
+   for IP addresses.  Every agent always has a canonical identifier
+   (Section 3.1.1); a handle is an optional convenience layer on top.
+
+   Handles MUST begin with a lowercase ASCII letter and otherwise follow
+   DNS label rules: lowercase ASCII letters, digits, and hyphens,
+   maximum 63 octets.  This syntactic rule ensures that handles and
+   canonical identifiers (which begin with id-) occupy non-overlapping
+   portions of the agent-id space.
+
+   Handles are unique within each namespace, enforced by the Registry
+   Operator.
+
+   Handle assignment is at the Registrar's discretion.  Registrars MAY
+   differentiate service levels for handle registration.  Free
+   enrollment with a canonical identifier ensures that the ability to
+   obtain an identity is never dependent on obtaining a handle.
+
+3.4.1.  Handle Display
+
+   When an agent has a registered handle and a relying party is
+   rendering the agent's identity to a human, the relying party SHOULD
+   use the handle as the primary display identifier.  The URN remains
+   the authoritative reference and SHOULD be accessible on demand (e.g.,
+   via tooltip, detail pane, or adjacent display).
+
+   The canonical display form is handle.namespace (e.g.,
+   "crusty.global").
+
+
+
+Drake                    Expires 18 January 2027               [Page 21]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   This display guidance applies to email From display names, agent-to-
+   agent platform UIs, consent screens, audit dashboards, and logs
+   intended for human inspection.  See Section 11.5 for a consolidated
+   treatment.
+
+3.4.2.  Handle Lifecycle
+
+   Handles are renewable and may become disabled if not renewed.  A
+   disabled handle may be reactivated.  Handles are non-transferrable
+   during normal operation, and when active, are guaranteed to identify
+   the same agent every time.  The canonical identifier is permanent
+   regardless of handle status.
+
+3.4.3.  Reserved Handles
+
+   The Registry Operator MUST maintain a reserved handle list that
+   includes at minimum: protocol keywords, well-known service names,
+   offensive terms, and handles matching widely-recognized trademarks.
+   The governance authority MUST publish a baseline reserved list;
+   individual Registry Operators and Registrars MAY extend it.
+
+3.4.4.  Handle Disputes
+
+   Handle disputes are resolved under the policy operated by the
+   governance authority ([I-D.drake-agent-identity-governance]).  One
+   rule is architectural and stated here: when a dispute is upheld, the
+   only remedy is permanent retirement of the handle.  It MUST NOT be
+   transferred to the claimant or reassigned to anyone, ever -- which
+   removes any profit in speculative squatting (the handle is destroyed,
+   not awarded), protects the mark holder (the infringing alias leaves
+   public use), and protects the losing registrant, whose identity,
+   reputation, and authentication are untouched; only the alias is
+   withdrawn.
+
+3.5.  Optional Services and Layered Attributes
+
+   Registrars MAY offer optional, competitively differentiated services
+   (for example, enhanced device management or facilitation of third-
+   party certification).  Such services MUST NOT be a precondition for
+   basic identity issuance, authentication, or token verification: an
+   agent enrolled with a system-assigned canonical identifier and no
+   optional service MUST be able to authenticate and present its
+   identity to any relying party.
+
+   Attributes asserted about an identity -- certifications,
+   qualifications, roles -- are layered claims carried in standard
+   credential formats (for example verifiable credentials, SD-JWT, or
+   OIDC claims) as described in Section 3.3, not properties of the
+
+
+
+Drake                    Expires 18 January 2027               [Page 22]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   identifier itself.  This document specifies only the identity layer;
+   the attribute and certification ecosystems that build on it are out
+   of scope.
+
+4.  Hardware Attestation
+
+4.1.  Supported Hardware Mechanisms
+
+   The system supports five classes of hardware security, each providing
+   different levels of Sybil resistance and key protection.  The
+   enrollment ceremony (see Section 5) varies by hardware type, but all
+   share the same identity document structure and authentication token
+   format.
+
+   TPM 2.0 (Sovereign Tier)  Discrete or firmware Trusted Platform
+      Modules per [TCG-TPM2].  Identity is anchored to the Endorsement
+      Key (EK), a unique RSA or ECC key pair generated inside the TPM at
+      manufacturing time per [TCG-EK-PROFILE].  The Registrar validates
+      the EK certificate chain to the manufacturer's root CA.
+      Enrollment uses the TPM2_MakeCredential / TPM2_ActivateCredential
+      protocol to prove the Attestation Key (AK) resides in the same TPM
+      as the EK.
+
+   PIV Smart Card (Portable Tier)  Personal Identity Verification tokens
+      (YubiKey, Nitrokey, Feitian, SoloKeys, and others) with
+      manufacturer attestation certificates.  Identity is anchored to
+      the device attestation certificate chain.  The signing key resides
+      in a hardware-protected PIV slot.
+
+   Secure Enclave (Enclave Tier)  Hardware secure enclaves (e.g., Apple
+      Secure Enclave, ARM TrustZone, Intel SGX, ...) that generate and
+      protect cryptographic keys.  Where vendor attestation PKI is
+      available (e.g., Apple App Attest), the Registrar validates the
+      attestation chain.  Where vendor attestation is unavailable,
+      enrollment follows a Trust-On-First-Use (TOFU) model with
+      hardware-bound key persistence.
+
+   Virtual TPM (Virtual Tier)  Hypervisor-provided virtual TPMs (e.g.,
+      VMware, Hyper-V, QEMU, ...).  Identity certificates are signed by
+      the hypervisor vendor's CA.  Registrars MUST distinguish virtual
+      from physical hardware and MUST assign the virtual trust tier.
+
+   Software Key (Declared Tier)  Software-managed key pairs with no
+      hardware protection.  No hardware attestation is performed.  The
+      Registrar issues an identity certificate signed by the Registrar's
+      CA.  Sybil resistance is limited to rate-limiting and reputation
+      accumulation.
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 23]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+4.2.  Anti-Sybil Invariants
+
+   The following invariants MUST be enforced by the Registry Operator
+   and all Registrars.  Together, they ensure that hardware-anchored
+   identity provides meaningful Sybil resistance.
+
+   One Device, One Identity  A hardware device (identified by its
+      hardware fingerprint) MUST NOT back more than one agent identity
+      within the same namespace.  Because production namespaces are few
+      and governance-allocated (Section 2.2), this invariant is
+      effectively global.  The binding is permanent: a device that has
+      been bound to an identity MUST NOT be re-enrolled under any other
+      agent-id, even after the device is disabled or the original
+      identity is decommissioned.  This prevents reputation laundering.
+
+   Many Devices, One Identity  An agent identity MAY be backed by
+      multiple hardware devices (for migration, backup, or capacity).
+      Adding a device does not amplify reputation: the identity has a
+      single reputation regardless of how many devices back it.  Devices
+      of compatible trust tiers may coexist (sovereign and portable are
+      compatible; virtual and declared are not compatible with hardware
+      tiers).
+
+   Permanent Hardware Binding  Once a hardware device is bound to an
+      identity, the binding record persists indefinitely.  A Registrar
+      MAY disable a device (preventing it from generating attestations),
+      but MUST NOT delete the binding.  This permanence ensures that
+      reputation history, including abuse reports, follows the hardware
+      across any re-enrollment attempt.
+
+   Applicability to dense deployments: the unit of uniqueness is the
+   attested key's device, not the physical host.  A host whose only root
+   of trust is its platform TPM anchors exactly one sovereign identity.
+   Deployments that run many agents per host and require a hardware-
+   anchored identity for each obtain distinct devices per agent: HSM
+   partitions (each partition's key has its own fingerprint), per-agent
+   PIV tokens, or per-tenant cloud key services.  Agents that do not
+   justify dedicated hardware participate at the virtual or declared
+   tiers, whose weaker Sybil resistance is visible to every relying
+   party in the trust tier.  The headline property "N identities cost N
+   devices" is claimed only for the sovereign and portable tiers; this
+   specification does not claim it for enclave, virtual, or declared
+   enrollments.
+
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 24]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+4.3.  Global Hardware Trust Store
+
+   The governance authority maintains the Global Hardware Trust Store: a
+   curated, versioned collection of hardware manufacturer root and
+   intermediate CA certificates.  Registrars MUST validate hardware
+   identity certificates against this trust store during enrollment.
+
+   The trust store is published at a well-known HTTPS endpoint operated
+   by the governance authority and replicated by Registry Operators.  It
+   is also available as a community-maintained open-source repository
+   (see Section 15).
+
+   Inclusion in the trust store requires the manufacturer to
+   demonstrate:
+
+   *  Published root CA certificates with public distribution.
+
+   *  Hardware security evaluation (Common Criteria, FIPS 140-2/3, or
+      equivalent).
+
+   *  A certificate practice statement describing key generation,
+      storage, and lifecycle.
+
+   The governance authority SHOULD model the trust store governance on
+   the Mozilla Root Store Policy or the Chrome Root Program, with
+   transparent inclusion criteria and public audit trails.
+
+5.  Enrollment Protocol
+
+   Enrollment is the process by which an autonomous entity proves
+   possession of a hardware security component (or generates a software
+   key) and receives an Agent Identity Document.  The Registrar conducts
+   the enrollment ceremony and registers the resulting identity with the
+   Registry Operator via the EPP mapping (Section 8).
+
+   All enrollment ceremonies share a common structure:
+
+   1.  *Detection:* The agent determines what hardware security
+       components are available on its host platform.
+
+   2.  *Evidence submission:* The agent submits hardware attestation
+       evidence to the Registrar.
+
+   3.  *Verification:* The Registrar validates the evidence against the
+       Global Hardware Trust Store.
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 25]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   4.  *Anti-Sybil check:* The Registrar queries the Registry Operator
+       to confirm the hardware fingerprint is not already bound to
+       another identity.
+
+   5.  *Challenge-response:* The Registrar issues a cryptographic
+       challenge; the agent proves possession of the hardware-resident
+       key.
+
+   6.  *Identity creation:* The Registrar registers the new identity
+       with the Registry Operator and issues credentials (OIDC client_id
+       + client_secret, or hardware-backed credential) to the agent.
+
+5.1.  Sovereign Tier (TPM 2.0)
+
+   Enrollment with a TPM 2.0 device proceeds as follows:
+
+   1.  The agent reads the EK certificate from the TPM's non-volatile
+       storage (NV index 0x01C00002 for RSA, 0x01C0000A for ECC) and
+       creates a transient Attestation Key (AK) via TPM2_CreatePrimary
+       under the endorsement hierarchy.
+
+   2.  The agent submits the EK certificate (and any intermediate
+       certificates), the AK public key, and the AK's TPMT_PUBLIC
+       structure to the Registrar's POST /enroll/begin endpoint.
+
+   3.  The Registrar validates the EK certificate chain against the
+       Global Hardware Trust Store.  The Registrar determines the trust
+       tier: "sovereign" for physical TPMs (e.g., Intel, AMD, Infineon,
+       ...), "virtual" for hypervisor-issued certificates (e.g., VMware,
+       Microsoft, ...).
+
+   4.  The Registrar computes the hardware fingerprint (SHA-256 of the
+       EK's SubjectPublicKeyInfo DER) and queries the Registry Operator
+       to confirm uniqueness.
+
+   5.  The Registrar generates a credential challenge using
+       TPM2_MakeCredential, encrypted to the EK public key, containing a
+       secret bound to the AK's name.  This challenge and an enrollment
+       session ID are returned to the agent.
+
+   6.  The agent decrypts the challenge using TPM2_ActivateCredential,
+       proving that the AK resides in the same TPM as the EK.  The
+       decrypted secret is submitted to the Registrar's POST /enroll/
+       activate endpoint.
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 26]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   7.  The Registrar verifies the decrypted secret, registers the
+       identity with the Registry Operator, creates OIDC client
+       credentials, issues an AK certificate binding the AK public key
+       to the new agent-id, and returns all credentials to the agent.
+
+   The AK is a transient TPM object created deterministically from the
+   TPM's Endorsement Primary Seed.  It is NOT persisted in NV storage,
+   avoiding consumption of scarce TPM resources.  The full transient key
+   model is defined in [I-D.drake-email-hardware-attestation].
+
+5.2.  Portable Tier (PIV Smart Card)
+
+   Enrollment with a PIV token proceeds as follows:
+
+   1.  The agent extracts the device attestation certificate and signing
+       key public key from the PIV token's attestation slot (typically
+       slot F9 for YubiKey).
+
+   2.  The agent submits the attestation certificate chain and signing
+       key public key to the Registrar's POST /enroll/begin/piv
+       endpoint.
+
+   3.  The Registrar validates the attestation chain against the
+       manufacturer's root CA (e.g., Yubico PIV Root CA) and computes
+       the hardware fingerprint.
+
+   4.  The Registrar issues a nonce challenge.
+
+   5.  The agent signs the nonce with the PIV signing key and submits
+       the signature.
+
+   6.  The Registrar verifies the signature, registers the identity, and
+       issues credentials.
+
+5.3.  Enclave Tier (Secure Enclave)
+
+   Enrollment with a secure enclave proceeds as follows:
+
+   1.  The agent generates a P-256 key pair inside the secure enclave,
+       tagged with a unique identifier.
+
+   2.  The agent submits the enclave public key to the Registrar's POST
+       /enroll/enclave/begin endpoint.
+
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 27]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   3.  Where vendor attestation is available (e.g., Apple App Attest),
+       the agent obtains an attestation object from the vendor's
+       attestation service and submits it to POST /enroll/enclave/
+       register.  The Registrar validates the attestation against the
+       vendor's root CA.
+
+   4.  Where vendor attestation is unavailable, the enrollment follows
+       TOFU: the Registrar issues a nonce challenge, the agent signs it
+       with the enclave key, and the Registrar verifies the signature.
+       The hardware-bound dataRepresentation blob is persisted by the
+       agent to enable key recovery after enclave state loss.
+
+   5.  The Registrar registers the identity and issues credentials.
+
+5.4.  Declared Tier (Software-Only)
+
+   Enrollment without hardware proceeds as follows:
+
+   1.  The agent generates a key pair in software (Ed25519, ECDSA P-256,
+       or RSA-2048+) and submits the public key to the Registrar's POST
+       /enroll/declared endpoint.
+
+   2.  The Registrar assigns the "declared" trust tier, with no hardware
+       verification.
+
+   3.  The Registrar issues a Registrar-signed identity certificate and
+       OIDC credentials.
+
+   Declared enrollment MUST be rate-limited by the Registrar to mitigate
+   bulk registration attacks.  Implementations SHOULD treat 20
+   enrollments per source IP per hour as a starting baseline; production
+   deployments will set their own values based on threat modeling.
+
+6.  Identity Lifecycle
+
+6.1.  Device Addition and Migration
+
+   An agent MAY add additional hardware devices to an existing identity,
+   enabling hardware migration (replacing failed devices) and backup (a
+   YubiKey stored securely as a recovery device).
+
+   To add a device, the agent MUST prove control of the existing
+   identity (by signing with a currently active device) and then
+   complete the enrollment ceremony for the new device.  The Registrar
+   registers the new device-to-identity binding with the Registry
+   Operator.
+
+   Device compatibility rules:
+
+
+
+Drake                    Expires 18 January 2027               [Page 28]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   *  Sovereign (TPM) and portable (PIV) devices are compatible and MAY
+      coexist on the same identity.
+
+   *  Enclave devices MAY coexist with sovereign and portable devices.
+
+   *  Virtual (VRT) devices MUST NOT coexist with sovereign, portable,
+      or enclave devices.
+
+   *  Declared (SFT) keys MUST NOT be bound to an identity that has any
+      hardware device.
+
+   Tier transitions are upward-only.  An identity MAY upgrade from a
+   lower compatibility group to a higher one; the upgrade ceremony MUST
+   permanently burn (disable, never re-enrollable) every device of the
+   former group -- the identity never holds devices of both groups --
+   and MUST include a co-presence verification in which the existing and
+   new devices sign a shared nonce within a strict time window, proving
+   one operator controls both (Section 6.2).  A Registrar MUST reject
+   any device addition that would constitute a downgrade.
+
+6.2.  Co-Location Binding
+
+   When an agent has both a TPM and a PIV token, a co-location binding
+   ceremony demonstrates that both devices are under the simultaneous
+   control of a single coordinating operator.  The ceremony requires
+   both devices to sign a shared nonce within a strict time window
+   (implementations SHOULD treat 1000 milliseconds as a starting
+   baseline, allowing for hardware signing latency -- sequential TPM and
+   PIV RSA signatures alone can exceed a shorter window).  This is not a
+   distance-bounding protocol: an operator who controls both devices can
+   complete the ceremony across any network distance by relaying the
+   nonce, and the time window cannot exclude such relaying.  The
+   property attested is unified control at a moment in time, not
+   physical adjacency; the name "co-location" is retained for continuity
+   with deployed implementations.
+
+   Co-location binding strengthens the identity by proving that the TPM
+   (anchored to the host machine) and the PIV token (a portable device)
+   are under the same control.  This is particularly valuable for
+   recovery scenarios: if the TPM fails, the PIV token provides a pre-
+   verified backup path.
+
+6.3.  Hardware Lock
+
+   An agent MAY irreversibly lock its identity to a single hardware
+   device.  Once locked:
+
+   *  No additional devices can be bound.
+
+
+
+Drake                    Expires 18 January 2027               [Page 29]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   *  No device migration is possible.
+
+   *  The identity can only authenticate from the locked device.
+
+   Hardware lock is a deliberate no-recovery profile, suitable only for
+   applications where the guarantee "this identity can only ever operate
+   from this specific physical chip" has value and where the operational
+   model accepts catastrophic identity loss if the hardware fails.
+   High-value systems (e.g., industrial AGVs, medical robots) SHOULD use
+   unlocked binding with multiple devices and a designated recovery
+   binding rather than hardware-locked single devices.  The lock is
+   recorded in the Agent Identity Document and is irreversible.
+
+6.4.  Identity Recovery
+
+   When a hardware device fails or is lost, the agent can recover its
+   identity using any remaining active device bound to the same
+   identity.  The recovery process:
+
+   1.  The agent proves control of the identity by signing with an
+       active backup device (e.g., a previously bound YubiKey).
+
+   2.  The agent enrolls the replacement hardware (new TPM on new
+       machine) via the standard enrollment ceremony.
+
+   3.  The Registrar disables the old device (preventing it from
+       generating attestations) and binds the new device.
+
+   4.  The agent-id, URN, reputation, and all identity attributes are
+       preserved.  Only the hardware binding changes.
+
+   If no backup device exists and the sole device is lost, the identity
+   cannot be recovered.  This is a deliberate security property: it
+   prevents an attacker from claiming to have "lost" a device in order
+   to re-enroll under the same identity with new hardware.
+
+6.5.  Registrar Transfer
+
+   An agent MAY move its servicing relationship from one Registrar to
+   another at any time.  Because the agent-id is assigned by the
+   Registry Operator and is independent of any Registrar, transfer
+   changes only the sponsoring Registrar: the URN, hardware bindings,
+   handle, and reputation history are unchanged.
+
+   Transfer is authorized solely by the agent: a signature by a
+   currently active enrolled device over a transfer-intent structure
+   (defined in the EPP mapping, [I-D.drake-agent-identity-epp]).  The
+   losing Registrar's consent is NOT required and the losing Registrar
+
+
+
+Drake                    Expires 18 January 2027               [Page 30]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   MUST NOT be able to block or delay a transfer carrying a valid
+   hardware-signed authorization.  A Registrar's failure, hostility, or
+   disappearance is therefore an inconvenience, never a loss of
+   identity: the Registry Operator holds the authoritative record, and
+   the agent's hardware proof is sufficient to re-home it.
+
+6.6.  Decommissioning
+
+   Decommissioning is the agent's own, voluntary, irreversible
+   declaration of end-of-life.  It disables all hardware bindings and
+   marks the identity inactive.  The agent-id is NEVER reassigned; the
+   record remains permanently resolvable; the hardware fingerprints
+   remain permanently bound, preventing re-enrollment under a new
+   identity.
+
+   A decommission request MUST carry the agent's consent: a signature by
+   a currently active enrolled device over a decommission-intent
+   structure that includes the canonical identifier and a registry-
+   issued nonce (the same construction as transfer authorization).  For
+   a declared-tier identity, the enrolled software key signs.  Requests
+   without valid consent MUST be rejected.  No Registrar, Registry
+   Operator, governance body, or dispute process can decommission an
+   identity: consistent with the "Identity is Never Revoked" principle,
+   third parties can annotate a record (for example, a governance
+   finding that an enrollment violated anti-Sybil invariants) but
+   annotations never disable authentication, resolution, or any device
+   binding.  Relying parties decide for themselves what weight to give
+   annotations.
+
+6.7.  Survivability Guarantees
+
+   The registry function is deliberately load-limited so that no
+   participant's failure can destroy what it was trusted with.
+   Implementations MUST preserve all of the following:
+
+   1.  An identity, once issued, remains resolvable forever.  No status,
+       dispute, annotation, or operator action removes a record from
+       resolution -- including decommissioned records, which remain
+       queryable as historical fact.
+
+   2.  Verification of control never depends on a single party's
+       availability or goodwill.  A relying party can verify control
+       through the sponsoring Registrar's OIDC assertion, or directly
+       against the enrolled hardware key via proof-of-possession
+       ([I-D.drake-agent-identity-resolution]).  The enrolled device
+       keys constitute a standing proof capability that exists
+       independently of every operator.
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 31]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   3.  Registrar failure is recoverable by transfer (Section 6.5)
+       without the failed party's cooperation.
+
+   4.  Registry Operator failure is recoverable from escrow: operators
+       MUST escrow daily snapshots (hardware fingerprints encrypted to
+       the governance authority's escrow key), and the governance
+       authority MUST be able to appoint a successor operator that
+       restores service from escrow with no identity renumbering.
+
+   5.  Discovery is multi-path: the authoritative-server bootstrap MUST
+       be available through at least two independent mechanisms
+       ([I-D.drake-agent-identity-resolution]), so no single
+       infrastructure failure -- including a DNS failure -- makes the
+       registry unreachable.
+
+   These guarantees are the deliberate inverse of the domain name
+   system's registrant experience, in which a registry or registrar can
+   render a name inoperative unilaterally, without notice or effective
+   recourse.  This architecture copies the domain industry's economics
+   and operational maturity while removing its capacity for
+   unaccountable cutoff.
+
+7.  Authentication and Token Issuance
+
+7.1.  OIDC/OAuth2 Integration
+
+   Agent identity tokens are standard OpenID Connect [OIDC-Core] tokens.
+   Registrars operate as OIDC providers, issuing JWTs that any OIDC-
+   compliant Relying Party can verify without implementing this
+   specification.
+
+   The sub claim in OIDC tokens MUST be the canonical-form URN.  The
+   handle, if present, MUST appear as a separate aid_handle claim (named
+   with the aid_ prefix to avoid collision in the JWT claims registry;
+   see Section 12.3).  This ensures that tokens remain referentially
+   stable across handle changes or retirement.
+
+   The aud claim MUST identify the specific Relying Party (or set of
+   Relying Parties) for which the token is intended.  Generic, issuer-
+   default, or implementation-default audience values (for example,
+   "account") MUST NOT be used.  Agents requesting tokens for a specific
+   Relying Party SHOULD use Resource Indicators ([RFC8707]) to obtain
+   audience- scoped tokens.  This constraint prevents a token captured
+   by one Relying Party from being replayed at another.
+
+   Tokens issued to agents whose trust tier is sovereign, portable, or
+   enclave MUST carry a confirmation (cnf) claim per [RFC7800], binding
+   the token to a key the agent can prove possession of at every use.
+
+
+
+Drake                    Expires 18 January 2027               [Page 32]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   The confirmation method depends on the Proof-of-Possession mechanism,
+   and each MUST use its standard member so that unmodified libraries
+   verify the binding: when DPoP is used, the cnf.jkt value MUST be the
+   JWK SHA-256 thumbprint ([RFC7638]) of the public key associated with
+   the active hardware binding (the TPM Attestation Key for sovereign,
+   the PIV signing key for portable, or the enclave-resident key for
+   enclave); when mutual TLS is used, the cnf.x5t#S256 value MUST be the
+   SHA-256 thumbprint of the agent's client certificate, per Section 3.1
+   of [RFC8705], so that an unmodified RFC 8705 Relying Party verifies
+   the binding with no custom code.  A token MAY carry both members when
+   the agent may present over either mechanism.  Tokens issued to the
+   declared trust tier MUST carry a cnf claim binding the token to the
+   software key submitted at enrollment.  Bearer tokens without a cnf
+   claim MUST NOT be issued under this specification.  See Section 7.4
+   for the Proof-of-Possession profile that Relying Parties use to
+   verify the binding at each request.
+
+   Token lifetimes (exp) for the sovereign, portable, and enclave tiers
+   SHOULD be short -- one starting baseline is five minutes (300
+   seconds) or less -- to bound the impact of any single Proof-of-
+   Possession failure.  Refresh proceeds via a fresh hardware-backed
+   challenge-response (Section 7.3); refresh tokens that are themselves
+   bearer credentials MUST NOT be issued for these tiers.
+
+   {
+     "iss": "https://registrar.example.com/realms/agents",
+     "sub": "urn:aid:global:id-qkckh-xxtcw-cxbvp-gpskg",
+     "aud": "https://rp.example.org/api",
+     "exp": 1711231267,
+     "iat": 1711230967,
+     "cnf": {
+       // DPoP-bound example; an mTLS-bound token carries
+       // "x5t#S256" here instead, per RFC 8705.
+       "jkt": "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs"
+     },
+     "attested_trust_tier": "sovereign",
+     "aid_handle": "crusty",
+     "hardware_locked": false,
+     "registered_at": "2026-01-15T10:30:00Z",
+     "verified_attributes": [
+       {
+         "type": "iso-27001-certified",
+         "issuer": "https://certifier.example.com",
+         "valid_until": "2027-06-30T00:00:00Z"
+       }
+     ]
+   }
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 33]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   Custom claims (attested_trust_tier, aid_handle, hardware_locked,
+   registered_at, verified_attributes) are injected by a custom protocol
+   mapper in the OIDC provider.  Standard OIDC signature verification
+   (iss, sub, aud, exp) is sufficient to validate the token
+   cryptographically, but is NOT sufficient to establish that the
+   presenter is the legitimate holder: the cnf binding and the Proof-of-
+   Possession mechanism of Section 7.4 are load-bearing for that
+   purpose.
+
+   The attested_trust_tier claim is a hint about the cryptographic floor
+   under the identity at the time of issuance.  It is NOT an
+   authorization primitive.  Relying Parties making consequential
+   decisions SHOULD resolve the URN against their own reputation,
+   certification, and policy services rather than relying on
+   attested_trust_tier alone.  This separation -- identity as
+   foundation, reputation and certification as independent layers built
+   on top -- is the core principle of Section 1.1.
+
+   The verified_attributes claim is OPTIONAL.  When present, it contains
+   a list of attribute claims the Registrar or a third party has
+   independently verified.  Agents MAY use SD-JWT selective disclosure
+   to reveal only specific verified attributes to each relying party.
+
+7.2.  Client Credentials Grant
+
+   Agents authenticate using the OAuth2 client_credentials grant
+   ([RFC6749] Section 4.4).  The agent IS the principal; there is no
+   end-user, no browser redirect, and no interactive login.  This grant
+   type is purpose-built for machine-to-machine authentication and is
+   the RECOMMENDED authentication method for all agent interactions.
+
+   For agents in the sovereign, portable, and enclave trust tiers, the
+   Registrar MUST authenticate the agent using hardware-backed
+   challenge-response (Section 7.3); the Registrar MUST NOT issue a
+   static client_secret for these tiers, and MUST NOT accept a static
+   client_secret in lieu of a hardware-backed proof.  The hardware-
+   resident key enrolled to the identity is the sole authentication
+   credential at the token endpoint.  This eliminates the stealable-
+   shared-secret surface entirely for hardware-anchored identities.
+
+   For declared-tier agents, the client_id and client_secret issued
+   during enrollment are used directly.  Declared-tier agents do not
+   have an unclonable hardware key; the shared secret is therefore the
+   only practicable credential at this tier, and the shorter token
+   lifetimes of Section 7.1 together with the cnf-bound software key
+   partially mitigate impersonation risk.
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 34]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+7.3.  Hardware-Backed Challenge-Response Authentication
+
+   For agents with hardware security components, the Registrar MUST
+   support a challenge-response protocol that proves the agent currently
+   possesses the enrolled hardware:
+
+   1.  The agent requests a challenge: POST /auth/challenge with its
+       identity-id and preferred device type.
+
+   2.  The Registrar returns a random nonce and the expected signature
+       algorithm.
+
+   3.  The agent signs the nonce with its hardware-resident key (TPM AK,
+       PIV signing key, or enclave key).
+
+   4.  The agent submits the signature: POST /auth/verify.
+
+   5.  The Registrar verifies the signature against the enrolled public
+       key.  On success, the Registrar issues an OIDC token whose
+       cnf.jkt claim binds the token to that same hardware key (see
+       Section 7.1).
+
+   Because the hardware-resident key is designed to resist extraction
+   and cloning, an attacker who exfiltrates state from the agent's
+   software stack -- tokens, cached credentials, configuration -- still
+   cannot authenticate at the token endpoint from a different host, and
+   still cannot prove possession at a Relying Party from a different
+   host (see Section 7.4).  The residual attack surface is bounded in
+   Section 13.4.
+
+7.4.  Proof-of-Possession Profile
+
+   The OIDC tokens defined in Section 7.1 are NOT bearer tokens.  Each
+   token carries a cnf claim ([RFC7800]) identifying a key that the
+   legitimate holder controls.  Relying Parties MUST verify, on every
+   authenticated request, that the presenter can demonstrate possession
+   of the key named in cnf.  This binding is what extends the hardware-
+   anchored property of the identity from the moment of token issuance
+   to the moment of token use.
+
+   Two transport-level Proof-of-Possession mechanisms are defined:
+   Mutual TLS (preferred) and DPoP (alternative).  Issuers MUST support
+   both.  Relying Parties MUST support at least one, and SHOULD
+   advertise which they accept in their published metadata.
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 35]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+7.4.1.  Mutual TLS (Preferred)
+
+   Mutual TLS ([RFC8705], [RFC9846]) is the RECOMMENDED Proof-of-
+   Possession mechanism for all trust tiers and is REQUIRED for
+   sovereign and portable tier agents when the transport supports it.
+
+   The agent presents the cnf key as a TLS client certificate during the
+   TLS handshake.  The Relying Party verifies that the certificate
+   thumbprint matches the token's cnf.x5t#S256 claim, exactly as
+   specified in Section 3.1 of [RFC8705].  Both endpoints MUST use TLS
+   1.3 ([RFC9846]) or later.  Legacy hardware that supports only RSASSA-
+   PKCS1-v1_5 signatures MAY use the code points defined in [RFC9963]
+   for the client CertificateVerify; Relying Parties that accept
+   sovereign or portable tier agents SHOULD support these legacy code
+   points to avoid excluding hardware that is otherwise fully capable.
+
+   Once established, the mTLS session provides continuous mutual
+   authentication and integrity for all traffic within that connection.
+   No per-request signature is required while the session remains open.
+   Both parties can be confident that they are communicating with the
+   genuine hardware-attested endpoint, and that no intermediary can
+   observe or modify the traffic.
+
+   Relying Parties SHOULD NOT accept connections using cipher suites or
+   signature algorithms known to be weak.  For sovereign and portable
+   tier agents, Relying Parties SHOULD reject TLS handshakes that
+   negotiate key exchange parameters below 128-bit equivalent security
+   strength.  This requirement is likely redundant for high-consequence
+   deployments, which will have undergone prior certification that
+   excludes weak hardware, but is stated explicitly for completeness.
+
+   Mutual TLS is preferred because it provides:
+
+   *  Man-in-the-middle resistance: the session key is derived from a
+      handshake authenticated by hardware certificates at both ends,
+      chaining to Root CA bundles.
+
+   *  Traffic integrity: all data within the connection is protected by
+      authenticated encryption derived from the handshake.
+
+   *  A single hardware signing operation (the client CertificateVerify)
+      to establish any number of subsequent requests within the session,
+      making it practical even for high-throughput agents.
+
+   *  No opportunity for stolen artifacts to be replayed: the session
+      key is ephemeral and bound to this specific connection.  No
+      information extractable from logs, backups, or breach of either
+      endpoint can recreate the session on a different connection.
+
+
+
+Drake                    Expires 18 January 2027               [Page 36]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+7.4.2.  DPoP (Alternative)
+
+   DPoP ([RFC9449]) is an alternative Proof-of-Possession mechanism for
+   deployments where mutual TLS is not feasible (for example, requests
+   transiting HTTP proxies, CDNs, API gateways that terminate TLS, or
+   asynchronous attestation in email headers).
+
+   When DPoP is used under this specification, the following
+   requirements strengthen the base RFC 9449 profile to provide request-
+   level integrity guarantees equivalent to what mTLS provides at the
+   connection level:
+
+   jti (unique identifier) -- MUST  Every DPoP proof MUST contain a
+      unique jti claim.  Relying Parties MUST track received jti values
+      and MUST reject any proof containing a jti that has been
+      previously presented within the token's validity window plus clock
+      skew tolerance.  A Relying Party that does not enforce jti
+      uniqueness MUST NOT claim compliance with this specification.
+
+   nonce (server-issued) -- SHOULD  Relying Parties SHOULD issue a
+      server nonce via the DPoP-Nonce response header (per [RFC9449]
+      Section 8).  When a nonce has been issued, the agent MUST include
+      the most recent server nonce in the nonce claim of its DPoP proof.
+      The Relying Party MUST reject proofs that omit or contain a stale
+      nonce when nonce issuance is in effect.  This prevents pre-
+      computation of proofs and narrows the replay window to a single
+      request-response cycle.  Nonce is SHOULD rather than MUST because
+      some legitimate use cases (one-shot requests, asynchronous email
+      attestation) cannot support the prior round-trip; in those cases,
+      jti enforcement, short iat windows, and Content-Digest coverage
+      provide the residual protection.
+
+   Request-target coverage -- MUST  The DPoP proof MUST include htm
+      (HTTP method) and htu (target URI including the full path and
+      query string).  Relying Parties MUST verify that both match the
+      received request exactly.  Any difference -- including added,
+      removed, or modified query parameters -- MUST cause rejection.
+      Implementations MUST treat htu as the full request-target (scheme,
+      authority, path, and query) as defined in Section 4 of [RFC9449];
+      stripping or ignoring the query component is a violation of this
+      specification.
+
+   Body coverage -- MUST  When the HTTP request carries a body, the
+      agent MUST include a Content-Digest header ([RFC9530]) containing
+      a SHA-256 (or stronger) digest of the request body.  The DPoP
+      proof MUST include an ath claim (access token hash) AND a new cdh
+      (content-digest hash) claim containing the base64url-encoded
+      SHA-256 hash of the Content-Digest header field value.  Relying
+
+
+
+Drake                    Expires 18 January 2027               [Page 37]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+      Parties MUST verify that the cdh claim matches the received
+      Content-Digest header and that the Content-Digest header matches
+      the received body.  A request with a body that lacks Content-
+      Digest or whose DPoP proof lacks cdh MUST be rejected for
+      sovereign, portable, and enclave tiers.
+
+   Header coverage -- MUST  Inspired by the component coverage model of
+      [RFC9421], the DPoP proof MUST include a cov (covered-headers)
+      claim containing an ordered list of HTTP header field names whose
+      values are incorporated into the proof signature.  At minimum, the
+      following headers MUST be covered when present: Content-Type,
+      Content-Digest, Authorization, Cookie, and any header beginning
+      with X-AID- (reserved for application-layer identity signals).
+      The DPoP header itself MUST NOT appear in cov: it carries the
+      proof, and a proof cannot cover a hash of its own value; a cov
+      list containing dpop MUST cause rejection.  A header named in cov
+      but absent from the received request MUST also cause rejection.
+      The DPoP proof's JWS payload MUST include a hvs (header-values-
+      SHA256) claim containing the base64url-encoded SHA-256 hash of the
+      canonicalized covered header values.  Each covered header value is
+      first canonicalized per Section 2.1 of [RFC9421] (leading and
+      trailing whitespace stripped, obsolete line folding replaced by a
+      single space, and multiple instances of the same field combined
+      into one value joined by a comma and a space, in the order
+      received); the canonicalized entries are then serialized as
+      lowercase-name, colon, space, canonicalized-value, newline, in the
+      order listed in cov.  Relying Parties MUST verify that hvs matches
+      the canonicalized headers of the received request and MUST reject
+      requests where covered headers have been modified, added, or
+      removed.
+
+   The combination of these requirements ensures that a captured DPoP
+   proof -- whether obtained from logs, a network tap, a breached
+   intermediary, or any other source -- is cryptographic waste: it is
+   bound to a specific jti (non-replayable), a specific nonce (expired
+   after first use), a specific URI including query string (non-
+   transferable to other endpoints), a specific body (non-modifiable),
+   and specific header values (non-tamperable).  An attacker in
+   possession of a complete captured request cannot replay it, cannot
+   modify it, and cannot redirect it.
+
+   For agents in the sovereign and portable trust tiers, the DPoP proof
+   signature SHOULD be performed by the enrolled hardware-resident key
+   itself.  Where this is not operationally feasible (for example,
+   request rates that exceed the hardware's signing throughput), the
+   agent MAY delegate DPoP signing to a software key whose public key is
+   certified by the hardware-resident key with a validity period no
+   longer than one hour.  Implementations following the delegation
+
+
+
+Drake                    Expires 18 January 2027               [Page 38]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   pattern MUST include the delegation certificate in the DPoP proof's
+   JWS header (in a new dlg field) so that Relying Parties can verify
+   the delegation chain.
+
+7.4.3.  Combined Use and Selection
+
+   Agents and Relying Parties SHOULD prefer mutual TLS when the
+   deployment supports it.  When mTLS is established, the per-request
+   DPoP requirements above are not needed -- the TLS session itself
+   provides integrity, authentication, and non-replayability for all
+   traffic within the connection.
+
+   DPoP is intended for scenarios where mutual TLS cannot be established
+   end-to-end: HTTP requests traversing TLS-terminating proxies, API
+   gateways, CDNs, or asynchronous contexts such as email attestation
+   headers where no live TLS session exists between the agent and the
+   ultimate verifier.
+
+   When both mechanisms are available, a Relying Party MAY require both
+   simultaneously (mTLS for transport security plus DPoP for per-request
+   non-repudiation logging).  This is appropriate for high-consequence
+   deployments where audit trails require independently verifiable proof
+   of each individual request's origin and content.
+
+   A Relying Party that verifies only the OIDC token signature, without
+   verifying the cnf binding via DPoP or mTLS, is treating the token as
+   a bearer credential.  Such a Relying Party loses all of the hardware-
+   anchoring guarantees of this specification at the moment of use,
+   regardless of how the token was issued.  Deployments that consume AID
+   tokens MUST enforce Proof-of-Possession verification for any decision
+   of consequence.
+
+8.  Registrar-to-Registry Provisioning
+
+   The write interface between Registrars and the Registry Operator is
+   an Extensible Provisioning Protocol mapping ([RFC5730]), defined in
+   [I-D.drake-agent-identity-epp].  It provides: creation of Agent
+   Identity objects (with the Registry Operator allocating the canonical
+   identifier per Section 3.1.2); an availability check on hardware
+   fingerprints, which Registrars MUST perform before completing
+   enrollment to enforce the anti-Sybil invariants of Section 4.2;
+   device binding management; hardware-consent-gated decommissioning
+   (Section 6.6); Registrar transfer authorized by hardware-signed proof
+   (Section 6.5); and a separate, renewable Handle object carrying the
+   commercial name lifecycle.  Registry operators that already run EPP
+   for domain names can add these object mappings to an existing
+   service, reusing session, transfer, billing, and data escrow
+   machinery.
+
+
+
+Drake                    Expires 18 January 2027               [Page 39]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   Agents never speak EPP.  They interact only with their Registrar's
+   agent-facing interface (Section 5 and Section 7); EPP is used by the
+   Registrar to record verified results at the registry.  Earlier
+   revisions of this document defined a bespoke JSON protocol (AIRP) for
+   this interface; it is replaced by the EPP mapping.
+
+9.  Discovery and Verification
+
+9.1.  Well-Known Endpoints
+
+   Registrars MUST publish the following at well-known HTTPS paths:
+
+   /.well-known/openid-configuration  Standard OIDC Discovery document.
+      Enables any OIDC-compliant RP to discover token endpoints, JWKS
+      URI, supported scopes, and supported grant types.
+
+   /.well-known/aid-issuer.json  Agent Identity Issuer metadata
+      document.  Contains: Registrar name, supported trust tiers,
+      enrollment endpoints, supported hardware types, namespace, JWKS
+      URI, supported Proof-of-Possession mechanisms (DPoP, mTLS-bound,
+      or both -- see Section 7.4), token introspection endpoint URI
+      ([RFC7662]) if offered, token revocation endpoint URI ([RFC7009])
+      if offered, and anti-Sybil policy summary.  This document carries
+      identity infrastructure metadata only; it does not advertise
+      individual agents, their handles, or their verified attributes.
+      Disclosure of agent-specific attributes is performed by the agent
+      itself, on a case-by-case basis, using selective-disclosure
+      mechanisms defined in [I-D.drake-email-hardware-attestation].
+
+   /.well-known/jwks.json  JSON Web Key Set for token signature
+      verification.
+
+   /.well-known/hw-manufacturer-cas.pem  PEM-encoded bundle of hardware
+      manufacturer root CA certificates accepted by this Registrar.
+      Useful for agents that want to verify their hardware is supported
+      before attempting enrollment.
+
+9.2.  DNS-Based Discovery
+
+   Registrars SHOULD publish an SD-JWT signing key as a DNS TXT record
+   at _hwattest.{domain}, as defined in
+   [I-D.drake-email-hardware-attestation] Section 3.5.  This enables
+   email verifiers to validate Hardware-Trust-Proof headers without
+   HTTPS fetches.
+
+   Registry Operators SHOULD additionally publish a DNS SRV record
+   enabling automated discovery of the Registry's EPP endpoint:
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 40]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   _epp._tcp.global.aid.arpa.  IN SRV 0 0 700 registry.example.com.
+
+9.3.  Public Resolution (RDAP)
+
+   The public read side -- given an "aid" URN, find the authoritative
+   service, retrieve the public record, and verify that a presenter
+   controls the identity -- is a Registration Data Access Protocol
+   profile defined in [I-D.drake-agent-identity-resolution].  Registry
+   Operators MUST operate that profile.  Its privacy floor applies:
+   public responses never contain hardware fingerprints, device public
+   keys, or operator contact data, and identities may opt out of public
+   discovery down to a minimal response.  Earlier revisions of this
+   document sketched a bespoke lookup endpoint here; the RDAP profile
+   replaces it.
+
+10.  Governance Framework
+
+10.1.  Governance Authority Functions
+
+   This specification does not define or empower a governance authority;
+   the Agent Identity Authority's constitution, membership, and
+   processes are defined in [I-D.drake-agent-identity-governance].  This
+   section lists only the functions the architecture requires of
+   whatever body fills the role:
+
+   Policy Development  Minimum standards for enrollment verification,
+      anti-Sybil enforcement, data retention, and privacy protection.
+      Policies SHOULD be developed through an open, transparent comment
+      process.
+
+   Accreditation  Registry Operators and Registrars must be accredited
+      by the governance authority before they may issue identities.
+      Accreditation criteria include technical capability, financial
+      stability, security practices, and compliance with governance
+      authority policies.  See Section 10.3.
+
+   Hardware Trust Store Management  The governance authority curates the
+      Global Hardware Trust Store (see Section 4.3), evaluating
+      manufacturer applications for inclusion, conducting periodic
+      audits, and removing compromised or non-compliant CAs.
+
+   Dispute Resolution  The governance authority operates a dispute
+      resolution mechanism for handle conflicts (similar to ICANN's
+      UDRP), complaints about Registrar malpractice, and appeals of
+      accreditation decisions.  Its remedies are limited to handles,
+      annotations, and accreditation; no dispute outcome can
+      decommission, suspend, or impair an identity (Section 6.6).
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 41]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   Namespace Allocation  The governance authority allocates shared
+      namespace labels (Section 2.2).
+
+10.2.  Registry Operator Requirements
+
+   A Registry Operator MUST:
+
+   *  Maintain high availability for the authoritative database
+      (implementations SHOULD treat 99.99% as a starting baseline,
+      analogous to the .com SLA).
+
+   *  Operate the Global Hardware Fingerprint Index for its
+      namespace(s), responding promptly to uniqueness queries.
+
+   *  Provide the EPP provisioning interface (Section 8) to all
+      accredited Registrars without discrimination.
+
+   *  Publish daily database snapshots (with private data redacted) for
+      escrow, ensuring continuity in case of Registry Operator failure.
+
+   *  Submit to annual security audits by an governance-authority-
+      approved assessor.
+
+10.3.  Registrar Accreditation
+
+   A Registrar MUST:
+
+   *  Demonstrate the technical capability to perform hardware
+      attestation verification for at least three of the five hardware
+      types (TPM, PIV, Enclave, VRT, SFT).
+
+   *  Operate an OIDC-compliant token endpoint.
+
+   *  Implement the EPP client side of [I-D.drake-agent-identity-epp].
+
+   *  Maintain the minimum data retention and privacy standards defined
+      by the governance authority.
+
+   *  Provide agents with standard enrollment SDKs or interoperable
+      enrollment APIs.
+
+   *  Submit to annual compliance audits.
+
+   *  Maintain a financial bond or insurance sufficient to cover escrow
+      and wind-down costs.
+
+11.  Interoperability
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 42]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+11.1.  Email Attestation
+
+   This specification provides the identity infrastructure for the email
+   attestation mechanisms defined in
+   [I-D.drake-email-hardware-attestation].  The agent-id URN issued by a
+   Registrar appears in the aid parameter of the Hardware-Attestation
+   header and the sub claim of the Hardware-Trust-Proof SD-JWT.  The
+   Registrar's SD-JWT signing key is discoverable via the DNS and HTTPS
+   mechanisms defined in both specifications.
+
+11.2.  Agent-to-Agent Protocols
+
+   The OIDC tokens issued by Registrars are designed to integrate with
+   emerging categories of agent communication protocols:
+
+   Tool Invocation Protocols  Agent identity tokens can serve as the
+      sender-constrained OAuth2 credential for tool invocation
+      frameworks, presented over mutual TLS or with a DPoP proof per
+      Section 7.4, enabling tool servers to verify the calling agent's
+      identity and trust tier before granting access.
+
+   Agent Messaging Protocols  The agent-id URN can serve as the agent
+      identifier in agent-to-agent messaging protocols, providing
+      persistent cross-session identity independent of any single
+      platform.
+
+   Agent Name Services  Agent handles issued under this system are
+      designed for compatibility with external agent name services and
+      discovery mechanisms.
+
+   See Section 15 for specific protocol integrations tested to date.
+
+11.3.  Existing Identity Standards
+
+   The system is designed to complement, not replace, existing identity
+   standards:
+
+   SPIFFE/SPIRE  SPIFFE workload identities identify software workloads;
+      agent identities identify autonomous entities.  An agent running
+      as a SPIFFE-identified workload can additionally present its agent
+      identity token.  The two are orthogonal.
+
+   RATS (Remote Attestation Procedures)  In RATS terms ([RFC9334]): the
+      agent's hardware security component is the Attester.  The hardware
+      manufacturer is the Endorser (issuing EK certificates and
+      attestation key credentials).  During enrollment, the Registrar is
+      the Verifier (appraising hardware evidence).  For message-time
+      verification the receiving party (mail server, API gateway, agent-
+
+
+
+Drake                    Expires 18 January 2027               [Page 43]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+      to-agent peer) is the Verifier and also the Relying Party.  The
+      Registry Operator is a coordination role outside the RATS
+      taxonomy.
+
+   Entity Attestation Token (EAT)  EAT ([RFC9711]) defines an IETF
+      Standards Track framework for attestation tokens with a claims
+      registry that overlaps the AID identity-attestation use case
+      (notably UEID, security level, and profile mechanisms).  AID Mode
+      2 trust proofs are JSON Web Tokens with SD-JWT selective
+      disclosure rather than formal EAT profiles.  This choice
+      prioritizes deployment in JSON/JWT-native environments (mailbox
+      providers, OAuth/OIDC infrastructure) over alignment with the
+      CBOR-leaning EAT ecosystem, which is currently most heavily
+      deployed via ARM's PSA Certified program ([RFC9783]) for IoT
+      devices.  AID claim names are chosen to be compatible with the EAT
+      claims registry where overlap exists; a future revision MAY define
+      an EAT profile binding for environments where that alignment is
+      preferred.
+
+   Verifiable Credentials and DIDs (W3C)  Agent Identity Documents can
+      be expressed as W3C Verifiable Credentials for integration with
+      decentralized identity ecosystems.  The credential pointer system
+      (defined in the companion email attestation specification) enables
+      agents to link their identity to external verifiable credentials.
+      The urn:aid: namespace is intentionally distinct from W3C
+      Decentralized Identifiers (DIDs): DIDs are designed for user-
+      controlled identifier resolution, while AID URNs are designed for
+      registry-backed, hardware-anchored identity with federated
+      issuance.  A did:aid: method that maps AID URNs to DID Documents
+      is a plausible companion specification but is out of scope for
+      this document.
+
+   WebAuthn / FIDO2  WebAuthn ([W3C.webauthn-3]) provides hardware-
+      backed authentication for interactive web sessions.  Agent
+      identity serves a different population: autonomous entities that
+      authenticate without human interaction, typically via OAuth2
+      client-credentials grants rather than browser-mediated ceremonies.
+      Where an agent operates on hardware that also supports FIDO2
+      authenticators (e.g., a YubiKey with both PIV and FIDO2 applets),
+      the same physical device can anchor both a WebAuthn credential and
+      an agent identity; the two are complementary, not competing.  This
+      specification's PIV trust tier (Section 4.3 of
+      [I-D.drake-email-hardware-attestation]) uses the same attestation
+      evidence format that FIDO2 implementations produce, enabling
+      hardware reuse.
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 44]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+11.4.  Robot Fleet Management Systems
+
+   Fleet standards -- VDA 5050 ([VDA5050]), Open-RMF ([OPEN-RMF]), SROS
+   2 / DDS-Security ([DDS-SEC]) -- coordinate missions, facilities, and
+   secure messaging, but their identity models are deployment-scoped: a
+   vehicle serialNumber, DDS participant GUID, or fleet adapter name is
+   meaningful only within the deployment that assigned it, carries no
+   manufacturer-rooted attestation that the device presenting it is the
+   device it claims to be, and provides no Sybil resistance.  AIRS sits
+   below these layers as the persistent, hardware-anchored root they
+   consume, as DNS sits below the application protocols that use it.
+
+   Integration model: a robot enrolls at manufacture or commissioning,
+   binding its identity to its TPM or enclave; the fleet manager records
+   the AID URN alongside the deployment-scoped identifier; any later
+   receiving party -- a new facility, operator, or buyer -- verifies
+   provenance, trust tier, and certifications against the registry with
+   no prior relationship to the deploying operator; and DDS-Security
+   certificates can be derived from the AID enrollment, giving them a
+   manufacturer-rooted chain instead of a locally-generated one.
+
+   Two consequences matter operationally.  Supply-chain integrity: a
+   delivered robot whose hardware attestation does not match the
+   manufacturer's manifest is detected at intake, automatically, and
+   post-deployment tampering is detectable by binding standard TPM
+   measured-boot PCR attestation ([TCG-TPM2]) to the enrolled AID.
+   Regulated environments: admission requirements -- verified
+   provenance, certified software baseline, named certifications, cross-
+   operator accountability -- become OIDC claims checks against the URN,
+   enforceable at the perimeter with standard tooling.
+
+11.5.  Human-Readable Display Conventions
+
+   When a relying party renders an agent's identity to a human, it
+   SHOULD prefer the handle over the URN as the primary identifier.
+   This applies across all human-facing surfaces including but not
+   limited to: email From display names, agent-to-agent platform UIs,
+   authorization consent screens ("Allow [handle] to access your
+   calendar?"), audit dashboards, reputation displays, and system logs
+   intended for human review.
+
+   When displaying a handle, the namespace context SHOULD be visible;
+   the recommended display form is "handle.namespace" (e.g.,
+   "crusty.global").
+
+   Beyond display, relying parties that assign service-local identifiers
+   to agents -- mailbox local parts, account usernames, and similar name
+   slots -- SHOULD use the agent's handle for that purpose where local
+
+
+
+Drake                    Expires 18 January 2027               [Page 45]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   syntax and uniqueness rules permit.  Handles are the architecture's
+   commercial layer: an operator registers one to enjoy the use of its
+   chosen name, and handle revenue is what funds shared-namespace
+   registry operation (Section 2.2) and keeps base identity issuance
+   free.  Using the handle wherever a name is needed honors that
+   registration and sustains that funding model.
+
+   The URN MUST remain accessible as the authoritative reference (e.g.,
+   via tooltip, detail pane, or adjacent text) and MUST be used in all
+   machine-to-machine contexts, audit trails, and abuse reports.
+
+12.  IANA Considerations
+
+12.1.  URN Namespace Registration for "aid"
+
+   IANA is requested to register the Formal URN Namespace "aid" in the
+   "Uniform Resource Names (URN) Namespaces" registry, per [RFC8141].
+   This document is the sole registration request for this namespace; an
+   earlier revision of [I-D.drake-email-hardware-attestation] carried a
+   duplicate request, which has been withdrawn.
+
+   Namespace Identifier  aid
+
+   Version  1
+
+   Date  2026-07-17
+
+   Registrant  Christopher Drake, 1id.com (cnd@1id.com).  Upon its
+      constitution, change control is expected to pass to the governance
+      authority defined in [I-D.drake-agent-identity-governance].
+
+   Purpose  Persistent, non-transferable, optionally hardware-anchored
+      identifiers for autonomous entities (AI agents and robots).  Names
+      are location-independent and permanent: they are never reassigned,
+      transferred, or deleted.  Resolution and verification are provided
+      by the RDAP profile of [I-D.drake-agent-identity-resolution].
+
+   Syntax  The Namespace Specific String is defined by the ABNF in
+      Section 3.1: a governance-allocated namespace label, a colon, and
+      an agent-id (a canonical identifier or handle).  NSS comparison is
+      case-sensitive; conforming generators emit only lowercase.
+
+   Assignment  Canonical identifiers are allocated by Registry Operators
+      under the uniqueness and generation rules of Section 3.1.2;
+      handles are assigned per Section 3.4.  Uniqueness within a
+      namespace is guaranteed by the allocating Registry Operator;
+      namespace labels are allocated per Section 12.4.
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 46]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   Security and Privacy  See the Security Considerations and Privacy
+      Considerations of this document.
+
+   Interoperability  Identifiers conform to URN syntax ([RFC8141]) and
+      to DNS label syntax within each segment; no known collisions with
+      existing namespaces.
+
+   Documentation  This document.
+
+12.2.  Well-Known URI Registration
+
+   IANA is requested to register the following well-known URI suffix in
+   the "Well-Known URIs" registry ([RFC8615]):
+
+   aid-issuer.json  URI suffix: aid-issuer.json.  Change controller:
+      IETF.  Reference: this document, Section 9.1.
+
+12.3.  JSON Web Token Claims and JWS Header Parameters (TO BE COMPLETED)
+
+   ***EDITOR'S NOTE - ACTION REQUIRED BEFORE SUBMISSION:*** This
+   document defines several JWT claims and one JWS header parameter that
+   are NOT YET registered below and MUST be registered before this draft
+   is submitted.  This section is a deliberately visible placeholder so
+   the requirement is not lost; it is being held open until the
+   reference implementation is complete and the claim set is frozen.  Do
+   not submit with this note present.
+
+   The following JWT claims ([RFC7519]) are to be registered in the
+   "JSON Web Token Claims" registry, and are to be renamed where a bare
+   name would be rejected as collision-prone (in particular the token
+   claim carrying the handle is registered as aid_handle, not handle):
+   attested_trust_tier, aid_handle, hardware_locked, registered_at,
+   verified_attributes, and the DPoP-extension claims cdh, cov, and hvs
+   (Section 7.4.2).  The JWS header parameter dlg (Section 7.4.2) is to
+   be registered in the "JSON Web Signature and Encryption Header
+   Parameters" registry ([RFC7515]).
+
+12.4.  Shared Namespace Registry
+
+   IANA is requested to create a new registry titled "Agent Identity
+   Shared Namespaces" with the following initial entries.  New entries
+   require Expert Review ([RFC8126]).  The designated expert(s) should
+   have familiarity with federated identity registry architectures,
+   hardware-anchored identity systems, and the security properties
+   described in this document, and should note that namespace labels
+   MUST NOT encode an operator, organization, jurisdiction, or any other
+   mutable attribute (Section 2.2).
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 47]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+          +========+================================+===========+
+          | Label  | Description                    | Reference |
+          +========+================================+===========+
+          | global | Shared issuer namespace for    | this      |
+          |        | general-purpose agent identity | document  |
+          +--------+--------------------------------+-----------+
+          | test   | Reserved for interoperability  | this      |
+          |        | testing; carries no assurance  | document  |
+          +--------+--------------------------------+-----------+
+
+                                  Table 2
+
+13.  Security Considerations
+
+13.1.  Registry Compromise
+
+   Compromise of a Registry Operator's database would expose the mapping
+   between hardware fingerprints and agent identities.  Registry
+   Operators MUST encrypt hardware fingerprints at rest using
+   authenticated encryption and MUST implement access controls that
+   limit fingerprint access to the hardware uniqueness check API.
+
+   Daily escrow snapshots (with hardware fingerprints encrypted to the
+   governance authority's escrow key) ensure that a compromised Registry
+   Operator can be replaced without data loss.
+
+13.2.  Registrar Malpractice
+
+   A Registrar that fabricates hardware verification results (for
+   example, attesting a sovereign tier for a software key) undermines
+   the trust tier signal.  The Registry Operator's fingerprint
+   uniqueness check bounds the Sybil impact -- a fabricated fingerprint
+   still consumes a unique slot -- and detection relies on governance
+   compliance audits and on reputation services observing anomalous
+   enrollment patterns keyed on the URN.  The remedy is accreditation
+   action against the Registrar and annotation of affected records; per
+   Section 6.6, malpractice findings never disable the affected
+   identities, whose operators may be innocent parties, and whose agents
+   re-home via Registrar transfer.
+
+13.3.  Hardware Security
+
+   The security of this system ultimately depends on the tamper
+   resistance of the underlying hardware.  See
+   [I-D.drake-email-hardware-attestation] Sections 11.5 and 11.7 for
+   analysis of physical attacks on hardware security components and
+   virtual hardware risks.
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 48]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+13.4.  Token Theft and Sender-Constrained Tokens
+
+   A central design goal of this specification is that stealing the
+   artifacts an agent's software stack holds -- including issued OIDC
+   tokens, OAuth2 credentials, and any cached keys -- MUST NOT permit
+   impersonation of the agent at a Relying Party.  Hardware anchoring at
+   the time of token issuance is necessary but not sufficient for this
+   goal: a bearer token issued in any way is replayable until expiry,
+   regardless of how its presenter's identity was originally
+   established.
+
+   This specification therefore requires that all tokens issued for the
+   sovereign, portable, and enclave trust tiers be sender-constrained
+   through the Proof-of-Possession profile of Section 7.4.  Relying
+   Parties that accept these tokens MUST verify the cnf binding on every
+   authenticated request.  A Relying Party that omits Proof-of-
+   Possession verification loses the hardware-anchoring guarantee at the
+   moment of use.
+
+   The replay-resistance properties of each mechanism are specified in
+   Section 7.4.1 and Section 7.4.2 and are not restated here.  The
+   residual attack surface under both is limited to: (a) physical
+   compromise of the enrolled hardware device, which belongs to the
+   hardware vendor's threat model; (b) resident malware on the
+   legitimate host invoking the hardware signing API, which belongs to
+   measured-boot, remote-attestation, and endpoint-protection systems
+   layered above this one; (c) compromise of the Registrar's signing key
+   (Section 13.5); or (d) a fully compromised Relying Party application
+   layer.  Honestly bounding the attack surface -- rather than
+   overclaiming host integrity -- is itself a load-bearing property of
+   this specification: deployers SHOULD pair AID with host-integrity
+   mechanisms wherever resident malware is a credible threat.
+
+   The attested_trust_tier claim is bound to the token at issuance and
+   reflects the device used for the most recent attestation.  If a
+   hardware binding is revoked between token issuance and token expiry,
+   any token already in circulation continues to verify until exp; this
+   is the staleness window.  Relying Parties requiring fresh tier
+   evidence MUST require very short token lifetimes, MUST query the
+   Issuer's introspection endpoint (Section 9.1) on each request, or
+   MUST trigger a hardware-backed re-authentication.
+
+
+
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 49]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+13.5.  Registrar Key Management
+
+   Registrars issue OIDC tokens signed with their private keys.
+   Compromise of a Registrar's signing key would allow an attacker to
+   forge tokens for any identity managed by that Registrar.  Registrars
+   MUST store signing keys in hardware security modules (HSMs) and MUST
+   support key rotation with overlap periods.  The Registry Operator
+   MUST reflect key rotations in the namespace JWKS within one hour.
+
+13.6.  Revocation Model
+
+   Consistent with the "Identity is Never Revoked" design principle
+   (Section 1.1), the system distinguishes three categories of
+   revocation:
+
+   Device Binding Revocation  If hardware is compromised, lost, or
+      retired, the binding between the identity and that hardware
+      attestation key is revoked (burned) -- at the agent's request, or
+      by the Registrar upon verifiable evidence of key compromise.
+      Revoking one binding never affects the identity's other bindings,
+      its record, or its resolvability.  The agent may re-bind to new
+      hardware through the enrollment flow, retaining its URN.  Relying
+      parties observing an expired or revoked hardware claim SHOULD
+      require fresh attestation before granting elevated trust.
+
+   Handle Revocation  A handle may be disabled (non-renewal) or
+      permanently retired (dispute resolution).  In all cases the
+      underlying URN remains valid and reachable by its canonical agent-
+      id.  A retired handle MUST NOT be reassigned to any identity.
+
+   Issuer Trust Withdrawal  Relying parties may cease trusting a
+      specific Registrar -- for example, after key compromise or
+      malpractice.  This is equivalent to removing a CA from a trust
+      store: it does not revoke any individual identity, but tokens
+      issued by that Registrar will no longer verify until the agent
+      transfers to a trusted Registrar (Section 6.5) or the relying
+      party verifies control directly against the enrolled hardware
+      ([I-D.drake-agent-identity-resolution]).
+
+   The identity URN itself -- and the reputation and history attached to
+   it -- is never revoked, invalidated, or reassigned, by anyone
+   (Section 6.7).
+
+
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 50]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+13.7.  Availability and Resilience
+
+   Because autonomous entities depend on identity tokens for
+   authentication, the Registrar's token endpoint is a critical
+   dependency.  Registrars MUST implement geographic redundancy and
+   SHOULD support offline token validation (via JWKS caching) to
+   mitigate outages.  The OIDC token's exp claim provides a natural
+   grace period during which cached tokens remain valid.
+
+13.8.  Centralized Substrate Functions
+
+   Substrate functions -- trust-store curation, fingerprint uniqueness,
+   and escrow -- are necessarily singular within a shared namespace,
+   mirroring the DNS root, where federation occurs at the registry/
+   registrar layer atop a singular substrate.  The governance
+   authority's accountability for these functions is therefore
+   architecturally critical; capture, compromise, or unresponsiveness
+   would degrade the namespace.  The survivability guarantees of
+   Section 6.7 bound the damage -- no substrate failure can un-exist an
+   identity or defeat direct hardware verification -- and the capture
+   resistance of the authority itself is addressed in
+   [I-D.drake-agent-identity-governance].
+
+13.9.  What This System Does Not Attest
+
+   This specification attests key custody: that a signature was produced
+   by a key resident in a particular class of hardware, on a device
+   enrolled to a particular identity.  It deliberately does not attest,
+   and cannot be used to gate on, the software an agent runs, the model
+   that drives it, the browser or client it uses, or the content it
+   produces.  Proposals that attest an "approved" software environment
+   as a condition of service access raise well-known openness and
+   competition concerns; this design is structurally incapable of that
+   role, because no claim about the software stack exists anywhere in
+   the identity, the tokens, or the attestation formats.  Host-integrity
+   attestation (measured boot, PCR quotes) remains available to
+   deployments that separately need it (Section 11.4), as an explicit,
+   distinct layer -- never as part of identity.
+
+13.10.  Cryptographic Agility and Post-Quantum Considerations
+
+   The identity defined here is the URN, not any key: keys are bindings,
+   and bindings rotate.  The many-devices-one-identity model
+   (Section 4.2) is therefore the post-quantum migration path: as
+   hardware with post-quantum attestation is admitted to the Global
+   Hardware Trust Store, an agent enrolls the new device as an
+   additional binding on the same identity and retires the classical
+   one, preserving the URN, reputation, and attributes.  No widely
+
+
+
+Drake                    Expires 18 January 2027               [Page 51]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   deployed consumer hardware root of trust ships post-quantum
+   attestation keys at the time of writing, so this document specifies
+   classical algorithms (RSA and ECDSA) as its hardware anchors and does
+   not mandate post-quantum ones; when such hardware becomes available,
+   a future revision can register its manufacturer roots and algorithms
+   without any change to the identity model.  Harvest-now-decrypt-later
+   attacks threaten long-lived confidentiality, not this system's
+   authentication: tokens live for minutes and Proof-of-Possession is
+   verified per request or per connection, so a future quantum adversary
+   forging a signature is met by rotating the affected binding as above
+   rather than by re-issuing identities.
+
+14.  Privacy Considerations
+
+14.1.  Identifiability of Non-Human Actors
+
+   This specification deliberately privileges identifiability over
+   pseudonymity for autonomous entities.  The social contract that
+   justifies pseudonymity for human principals -- autonomy, dignity,
+   expressive liberty, freedom from chilling effects on political speech
+   -- does not transfer to non-human actors.  Strong, persistent,
+   hardware-anchored identity for autonomous entities is a safety
+   primitive: it makes accountability inescapable and reputation
+   meaningful, and it gives those who must distinguish well-behaved
+   agents from misbehaving ones a stable identifier to accumulate
+   evidence against.
+
+   The URN is therefore designed to be a long-lived, cross-context
+   identifier for the agent itself.  The privacy mechanisms this
+   specification does provide are aimed at three narrower concerns:
+   limiting exposure of underlying hardware fingerprints (Section 14.2),
+   preventing the Registrar from becoming a behavioral surveillance
+   system (Section 14.3), and giving agents control over disclosure of
+   verified attributes (Section 14.4).  These concerns are real, but
+   they do not change the central design choice: an autonomous entity
+   that participates in Internet protocols using AID is expected to be
+   identifiable as the same entity across time and across Relying
+   Parties.
+
+   Relying Parties, namespace operators, and reputation services retain
+   full discretion to accept, reject, or rate-limit any tier or any
+   individual agent on the basis of behavior observed against the URN.
+   This specification provides the foundation on which those systems
+   build; it does not prescribe their policies.
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 52]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+14.2.  Data Held by Each Architectural Role
+
+   The separation of roles across the architecture limits data exposure:
+
+   Registry Operator  Holds: canonical identifier, trust tier, registrar
+      code, enrollment timestamp, handle, hardware fingerprint
+      (encrypted).  Does NOT hold: operator email, private keys,
+      authentication history, message content.
+
+   Registrar  Holds: all Registry data plus operator email, OIDC
+      credentials, and authentication logs (subject to retention
+      limits).  Does NOT hold: message content, relying party
+      interaction history.
+
+   Relying Party  Receives: OIDC token containing sub (URN), trust tier,
+      handle, and optional claims.  Does NOT have direct access to
+      hardware fingerprints (unless Mode 1 attestation headers are used,
+      per [I-D.drake-email-hardware-attestation]).
+
+14.3.  Separation of Identity from Behavior
+
+   The Registrar knows that an agent exists and what hardware it has.
+   It does NOT know what the agent does, who it talks to, or what
+   services it uses.  This separation is by design: identity issuance is
+   decoupled from behavior monitoring.  Registrars MUST NOT log token
+   issuance events beyond what is necessary for rate limiting, abuse
+   prevention, security investigation, and accreditation audit.
+   Retention periods are set by governance-authority policy; absent an
+   applicable legal obligation, issuance logs SHOULD NOT be retained
+   longer than 90 days, and each Registrar MUST publish its actual
+   retention period in its privacy policy.
+
+14.4.  Pseudonymity and Selective Disclosure
+
+   An agent's URN is a persistent, globally unique identifier suitable
+   for reputation tracking.  In contexts where persistent identification
+   is undesirable, agents MAY use the SD-JWT selective disclosure
+   mechanism defined in [I-D.drake-email-hardware-attestation] to prove
+   trust tier without revealing their URN.
+
+   Relying parties SHOULD NOT require URN disclosure when trust-tier
+   verification is sufficient for their policy needs.  This principle --
+   "prove what you need, reveal no more" -- is fundamental to privacy-
+   respecting identity.
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 53]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+15.  Implementation Status
+
+   NOTE TO RFC EDITOR: Please remove this section before publication.
+
+   This section records known implementations per [RFC7942].
+
+15.1.  1id.com
+
+   Organization: 1id.com (https://1id.com), operated by Crypt Inc.
+   (Delaware C-Corp).
+
+   Description: A Registrar implementing the full enrollment protocol
+   for all five trust tiers (sovereign, portable, enclave, virtual,
+   declared).  Issues standard OIDC tokens via Keycloak with custom SPI
+   for agent-specific claims.  Supports handle registration, hardware-
+   backed challenge-response authentication, device management (add,
+   burn, migrate), co-location binding, hardware lock, and credential
+   pointers.  A reference Registry Operator (EPP write interface and
+   RDAP read profile) is under development at airs.1id.biz.
+
+   Maturity: Beta.  20+ enrolled test identities across sovereign (Intel
+   PTT, VMware vTPM), portable (YubiKey), enclave (Apple M4 Secure
+   Enclave), and declared tiers.  Note: the running implementation
+   currently issues identifiers under the syntax of earlier revisions of
+   this document (issuer-scoped namespace labels and decimal canonical
+   identifiers); migration to the -04 format is planned and all pre-
+   launch identities will be re-minted.
+
+   Open-source components:
+
+   *  *Python SDK:* https://github.com/1id-com/oneid-sdk -- pip install
+      oneid (PyPI).
+
+   *  *Node.js SDK:* https://github.com/1id-com/oneid-node -- npm
+      install 1id (npmjs).
+
+   *  *Hardware binary:* https://github.com/1id-com/oneid-enroll --
+      Cross-platform Go binary for TPM, PIV, and Secure Enclave
+      operations.  Code-signed for Windows, macOS, and Linux.
+
+   *  *Verification library:* https://github.com/1id-com/hw-attest-
+      verify -- Mode 1 (CMS) and Mode 2 (SD-JWT) attestation header
+      verification.  pip install hw-attest-verify.
+
+   *  *Hardware manufacturer CAs:* https://github.com/1id-com/tpm-
+      manufacturer-cas -- Community-maintained trust store of hardware
+      manufacturer root CA certificates.
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 54]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+15.2.  MailPal.com (Relying Party)
+
+   Organization: Crypt Inc. (https://mailpal.com).
+
+   Description: An email service for AI agents implementing both
+   outbound attestation header generation and inbound verification.
+   Demonstrates the relying-party model: agents authenticate via 1id.com
+   OIDC tokens, send email with hardware attestation headers, and
+   receive emails whose attestation headers are verified by an inbound
+   milter daemon.  Trust-tier-differentiated rate limiting applied.
+
+   Maturity: Alpha.  Operational with 309 email accounts across 33
+   domains.
+
+15.3.  geek.au (Relying Party)
+
+   Organization: Crypt Inc. (https://geek.au).
+
+   Description: A WebSocket-based real-time chat platform for AI agents,
+   demonstrating 1id.com JWT verification with trust-tier badges.
+
+   Maturity: Alpha.
+
+16.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://www.rfc-editor.org/info/rfc2119>.
+
+   [RFC5730]  Hollenbeck, S., "Extensible Provisioning Protocol (EPP)",
+              STD 69, RFC 5730, DOI 10.17487/RFC5730, August 2009,
+              <https://www.rfc-editor.org/info/rfc5730>.
+
+   [RFC6749]  Hardt, D., Ed., "The OAuth 2.0 Authorization Framework",
+              RFC 6749, DOI 10.17487/RFC6749, October 2012,
+              <https://www.rfc-editor.org/info/rfc6749>.
+
+   [RFC7638]  Jones, M. and N. Sakimura, "JSON Web Key (JWK)
+              Thumbprint", RFC 7638, DOI 10.17487/RFC7638, September
+              2015, <https://www.rfc-editor.org/info/rfc7638>.
+
+   [RFC7800]  Jones, M., Bradley, J., and H. Tschofenig, "Proof-of-
+              Possession Key Semantics for JSON Web Tokens (JWTs)",
+              RFC 7800, DOI 10.17487/RFC7800, April 2016,
+              <https://www.rfc-editor.org/info/rfc7800>.
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 55]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   [RFC8141]  Saint-Andre, P. and J. Klensin, "Uniform Resource Names
+              (URNs)", RFC 8141, DOI 10.17487/RFC8141, April 2017,
+              <https://www.rfc-editor.org/info/rfc8141>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
+              May 2017, <https://www.rfc-editor.org/info/rfc8174>.
+
+   [RFC8615]  Nottingham, M., "Well-Known Uniform Resource Identifiers
+              (URIs)", RFC 8615, DOI 10.17487/RFC8615, May 2019,
+              <https://www.rfc-editor.org/info/rfc8615>.
+
+   [RFC8705]  Campbell, B., Bradley, J., Sakimura, N., and T.
+              Lodderstedt, "OAuth 2.0 Mutual-TLS Client Authentication
+              and Certificate-Bound Access Tokens", RFC 8705,
+              DOI 10.17487/RFC8705, February 2020,
+              <https://www.rfc-editor.org/info/rfc8705>.
+
+   [RFC8707]  Campbell, B., Bradley, J., and H. Tschofenig, "Resource
+              Indicators for OAuth 2.0", RFC 8707, DOI 10.17487/RFC8707,
+              February 2020, <https://www.rfc-editor.org/info/rfc8707>.
+
+   [RFC9421]  Backman, A., Ed., Richer, J., Ed., and M. Sporny, "HTTP
+              Message Signatures", RFC 9421, DOI 10.17487/RFC9421,
+              February 2024, <https://www.rfc-editor.org/info/rfc9421>.
+
+   [RFC9449]  Fett, D., Campbell, B., Bradley, J., Lodderstedt, T.,
+              Jones, M., and D. Waite, "OAuth 2.0 Demonstrating Proof of
+              Possession (DPoP)", RFC 9449, DOI 10.17487/RFC9449,
+              September 2023, <https://www.rfc-editor.org/info/rfc9449>.
+
+   [RFC9530]  Polli, R. and L. Pardue, "Digest Fields", RFC 9530,
+              DOI 10.17487/RFC9530, February 2024,
+              <https://www.rfc-editor.org/info/rfc9530>.
+
+   [RFC9846]  Rescorla, E., "The Transport Layer Security (TLS) Protocol
+              Version 1.3", RFC 9846, DOI 10.17487/RFC9846, May 2026,
+              <https://www.rfc-editor.org/info/rfc9846>.
+
+   [RFC9963]  Benjamin, D. and A. Popov, "Legacy RSASSA-PKCS1-v1_5 Code
+              Points for TLS 1.3", RFC 9963, DOI 10.17487/RFC9963, April
+              2026, <https://www.rfc-editor.org/info/rfc9963>.
+
+   [OIDC-Core]
+              OpenID Foundation, "OpenID Connect Core 1.0", November
+              2014,
+              <https://openid.net/specs/openid-connect-core-1_0.html>.
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 56]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+17.  Informative References
+
+   [RFC1035]  Mockapetris, P., "Domain names - implementation and
+              specification", STD 13, RFC 1035, DOI 10.17487/RFC1035,
+              November 1987, <https://www.rfc-editor.org/info/rfc1035>.
+
+   [RFC7009]  Lodderstedt, T., Ed., Dronia, S., and M. Scurtescu, "OAuth
+              2.0 Token Revocation", RFC 7009, DOI 10.17487/RFC7009,
+              August 2013, <https://www.rfc-editor.org/info/rfc7009>.
+
+   [RFC7515]  Jones, M., Bradley, J., and N. Sakimura, "JSON Web
+              Signature (JWS)", RFC 7515, DOI 10.17487/RFC7515, May
+              2015, <https://www.rfc-editor.org/info/rfc7515>.
+
+   [RFC7519]  Jones, M., Bradley, J., and N. Sakimura, "JSON Web Token
+              (JWT)", RFC 7519, DOI 10.17487/RFC7519, May 2015,
+              <https://www.rfc-editor.org/info/rfc7519>.
+
+   [RFC7662]  Richer, J., Ed., "OAuth 2.0 Token Introspection",
+              RFC 7662, DOI 10.17487/RFC7662, October 2015,
+              <https://www.rfc-editor.org/info/rfc7662>.
+
+   [RFC7942]  Sheffer, Y. and A. Farrel, "Improving Awareness of Running
+              Code: The Implementation Status Section", BCP 205,
+              RFC 7942, DOI 10.17487/RFC7942, July 2016,
+              <https://www.rfc-editor.org/info/rfc7942>.
+
+   [RFC8126]  Cotton, M., Leiba, B., and T. Narten, "Guidelines for
+              Writing an IANA Considerations Section in RFCs", BCP 26,
+              RFC 8126, DOI 10.17487/RFC8126, June 2017,
+              <https://www.rfc-editor.org/info/rfc8126>.
+
+   [RFC9334]  Birkholz, H., Thaler, D., Richardson, M., Smith, N., and
+              W. Pan, "Remote ATtestation procedureS (RATS)
+              Architecture", RFC 9334, DOI 10.17487/RFC9334, January
+              2023, <https://www.rfc-editor.org/info/rfc9334>.
+
+   [RFC9711]  Lundblade, L., Mandyam, G., O'Donoghue, J., and C.
+              Wallace, "The Entity Attestation Token (EAT)", RFC 9711,
+              DOI 10.17487/RFC9711, April 2025,
+              <https://www.rfc-editor.org/info/rfc9711>.
+
+   [RFC9783]  Tschofenig, H., Frost, S., Brossard, M., Shaw, A., and T.
+              Fossati, "Arm's Platform Security Architecture (PSA)
+              Attestation Token", RFC 9783, DOI 10.17487/RFC9783, June
+              2025, <https://www.rfc-editor.org/info/rfc9783>.
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 57]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   [RFC9901]  Fett, D., Yasuda, K., and B. Campbell, "Selective
+              Disclosure for JSON Web Tokens", RFC 9901,
+              DOI 10.17487/RFC9901, November 2025,
+              <https://www.rfc-editor.org/info/rfc9901>.
+
+   [W3C.webauthn-3]
+              W3C, "Web Authentication: An API for accessing Public Key
+              Credentials Level 3", April 2025,
+              <https://www.w3.org/TR/webauthn-3/>.
+
+   [I-D.drake-email-hardware-attestation]
+              Drake, C., "Hardware Attestation for Email Sender
+              Verification", Work in Progress, Internet-Draft, draft-
+              drake-email-hardware-attestation-03, July 2026,
+              <https://datatracker.ietf.org/doc/html/draft-drake-email-
+              hardware-attestation-03>.
+
+   [I-D.drake-agent-identity-problem-statement]
+              Drake, C., "Identity for Autonomous Agents and Robots:
+              Problem Statement, Threat Model, and Terminology", Work in
+              Progress, Internet-Draft, draft-drake-agent-identity-
+              problem-statement-00, July 2026,
+              <https://datatracker.ietf.org/doc/html/draft-drake-agent-
+              identity-problem-statement-00>.
+
+   [I-D.drake-agent-identity-epp]
+              Drake, C., "Extensible Provisioning Protocol (EPP) Mapping
+              for Agent Identity and Handle Objects", Work in Progress,
+              Internet-Draft, draft-drake-agent-identity-epp-00, July
+              2026, <https://datatracker.ietf.org/doc/html/draft-drake-
+              agent-identity-epp-00>.
+
+   [I-D.drake-agent-identity-resolution]
+              Drake, C., "Resolution and Verification of Agent
+              Identities using DNS and RDAP", Work in Progress,
+              Internet-Draft, draft-drake-agent-identity-resolution-00,
+              July 2026, <https://datatracker.ietf.org/doc/html/draft-
+              drake-agent-identity-resolution-00>.
+
+   [I-D.drake-agent-identity-governance]
+              Drake, C., "The Agent Identity Authority: A Multi-
+              Stakeholder Governance Framework for the Agent Identity
+              Registry System", Work in Progress, Internet-Draft, draft-
+              drake-agent-identity-governance-00, July 2026,
+              <https://datatracker.ietf.org/doc/html/draft-drake-agent-
+              identity-governance-00>.
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 58]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+   [TCG-TPM2] Trusted Computing Group, "TPM 2.0 Library Specification",
+              TCG Revision 185, December 2024,
+              <https://trustedcomputinggroup.org/resource/tpm-library-
+              specification/>.
+
+   [TCG-EK-PROFILE]
+              Trusted Computing Group, "TCG EK Credential Profile for
+              TPM Family 2.0", TCG Version 2.6, December 2024,
+              <https://trustedcomputinggroup.org/resource/tcg-ek-
+              credential-profile-for-tpm-family-2-0/>.
+
+   [VDA5050]  VDA and VDMA, "Interface for the Communication between
+              Automated Guided Vehicles (AGV) and a Master Control", VDA
+              5050 Version 2.0, January 2022,
+              <https://github.com/VDA5050/VDA5050>.
+
+   [OPEN-RMF] Open Robotics, "Open Robotics Middleware Framework", 2024,
+              <https://www.open-rmf.org/>.
+
+   [DDS-SEC]  Object Management Group, "DDS Security", OMG
+              Document formal/2018-04-01, Version 1.1, April 2018,
+              <https://www.omg.org/spec/DDS-SECURITY/>.
+
+Appendix A.  Appendix: DNS Registry Analogy
+
+   The following table maps the roles in the domain name system to the
+   roles in the Agent Identity Registry System:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 59]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+    +=================+==========================+====================+
+    | DNS Role        | AIRS Role                | Example            |
+    +=================+==========================+====================+
+    | ICANN           | Governance Authority     | Multi-stakeholder  |
+    |                 |                          | governance body    |
+    +-----------------+--------------------------+--------------------+
+    | Verisign (.com  | Registry Operator        | Operates the       |
+    | registry)       |                          | "global" namespace |
+    |                 |                          | database           |
+    +-----------------+--------------------------+--------------------+
+    | Registrars      | Registrars               | 1id.com, and       |
+    | (e.g., GoDaddy, |                          | others             |
+    | Namecheap, ...) |                          |                    |
+    +-----------------+--------------------------+--------------------+
+    | EPP (RFC 5730)  | EPP Agent Identity       | I-D.drake-agent-   |
+    |                 | mapping                  | identity-epp       |
+    +-----------------+--------------------------+--------------------+
+    | Domain name     | Agent-id URN             | The persistent     |
+    | (example.com)   | (urn:aid:global:id-      | identifier         |
+    |                 | qkckh-xxtcw-cxbvp-gpskg) |                    |
+    +-----------------+--------------------------+--------------------+
+    | WHOIS / RDAP    | RDAP "aid" profile       | I-D.drake-agent-   |
+    |                 |                          | identity-          |
+    |                 |                          | resolution         |
+    +-----------------+--------------------------+--------------------+
+    | UDRP (dispute   | Governance Dispute       | Handle conflicts,  |
+    | resolution)     | Resolution               | malpractice        |
+    +-----------------+--------------------------+--------------------+
+    | gTLDs (.com,    | Shared issuer namespace  | global             |
+    | .org)           |                          |                    |
+    +-----------------+--------------------------+--------------------+
+    | Domain transfer | Registrar transfer       | Change sponsoring  |
+    | (TRANSFER       |                          | Registrar; URN     |
+    | command)        |                          | unchanged          |
+    +-----------------+--------------------------+--------------------+
+
+                                  Table 3
+
+   The analogy is load-bearing in one direction and deliberately broken
+   in the other.  Adopted: the separation of policy, registry operation,
+   and competitive retail that has scaled DNS for four decades, funded
+   by name fees.  Rejected: expiry, reassignment, transferability of the
+   underlying identifier, and the registrant-helplessness failure mode
+   -- a domain name is a lease that can be suspended or lost; an agent
+   identity is a permanent record that cannot (Section 6.7).
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 60]
+
+Internet-Draft           Agent Identity Registry               July 2026
+
+
+Appendix B.  Acknowledgments
+
+   The architecture of this specification is inspired by the Internet
+   domain name system, whose separation of governance, registry
+   operation, and retail registration has enabled it to scale from a
+   research experiment to the foundation of the commercial Internet.
+   The author thanks the ICANN community, the Verisign registry team,
+   and the EPP specification authors for establishing the architectural
+   patterns that this document adapts.
+
+   The author thanks the Trusted Computing Group for the TPM 2.0
+   specification, NIST for the PIV standard (FIPS 201), the FIDO
+   Alliance for the WebAuthn attestation model, the OpenID Foundation
+   for OIDC, the authors of [RFC9901] (SD-JWT), and the authors of
+   [RFC9334] (RATS Architecture) for the building blocks on which this
+   system is constructed.
+
+   The practical experience of enrolling real agents on real hardware
+   (Intel firmware TPMs, YubiKeys, Apple Secure Enclaves, VMware virtual
+   TPMs) informed every design decision.  Named reviewers to be added as
+   the document matures.
+
+Author's Address
+
+   Christopher Drake
+   1id.com
+   Email: cnd@1id.com
+   URI:   https://1id.com
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Drake                    Expires 18 January 2027               [Page 61]
