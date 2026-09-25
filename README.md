@@ -3,7 +3,7 @@
 **Agent Identity Registry System**
 
 This is the companion repository for the IETF Internet-Draft
-[draft-drake-agent-identity-registry-00](https://datatracker.ietf.org/doc/draft-drake-agent-identity-registry/).
+[draft-drake-agent-identity-registry-04](https://datatracker.ietf.org/doc/draft-drake-agent-identity-registry/).
 
 ## Abstract
 
@@ -37,7 +37,7 @@ primary interface for autonomous entities.
 ## Repository Contents
 
 ```
-draft-drake-agent-identity-registry-00.xml   # I-D source (xml2rfc v3)
+draft-drake-agent-identity-registry-04.xml   # I-D source (xml2rfc v3)
 ```
 
 ## Building the Draft
@@ -46,8 +46,8 @@ The XML source uses [xml2rfc](https://xml2rfc.tools.ietf.org/) v3 format:
 
 ```bash
 pip install xml2rfc
-xml2rfc draft-drake-agent-identity-registry-00.xml --html
-xml2rfc draft-drake-agent-identity-registry-00.xml --text
+xml2rfc draft-drake-agent-identity-registry-04.xml --html
+xml2rfc draft-drake-agent-identity-registry-04.xml --text
 ```
 
 ## Architecture Overview
