@@ -114,16 +114,16 @@ Drake                     Expires 29 March 2027                 [Page 2]
 Internet-Draft           Agent Identity Registry          September 2026
 
 
-     5.5.  Declared Tier . . . . . . . . . . . . . . . . . . . . . .  26
+     5.5.  Declared Tier . . . . . . . . . . . . . . . . . . . . . .  27
    6.  Identity Lifecycle  . . . . . . . . . . . . . . . . . . . . .  27
      6.1.  Registry-Verifiable Actor Authorization . . . . . . . . .  27
      6.2.  Device Addition and Migration . . . . . . . . . . . . . .  27
      6.3.  Joint-Control Binding . . . . . . . . . . . . . . . . . .  28
      6.4.  Hardware Lock . . . . . . . . . . . . . . . . . . . . . .  29
      6.5.  Identity Recovery . . . . . . . . . . . . . . . . . . . .  29
-     6.6.  Registrar Transfer  . . . . . . . . . . . . . . . . . . .  29
+     6.6.  Registrar Transfer  . . . . . . . . . . . . . . . . . . .  30
      6.7.  Decommissioning . . . . . . . . . . . . . . . . . . . . .  30
-     6.8.  Survivability Guarantees  . . . . . . . . . . . . . . . .  30
+     6.8.  Survivability Guarantees  . . . . . . . . . . . . . . . .  31
    7.  Authentication and Token Issuance . . . . . . . . . . . . . .  31
      7.1.  OAuth 2.0 JWT Access Tokens . . . . . . . . . . . . . . .  31
      7.2.  Client Credentials Grant  . . . . . . . . . . . . . . . .  33
@@ -1302,8 +1302,8 @@ Internet-Draft           Agent Identity Registry          September 2026
        the ceremony.
 
    3.  Prove that the Attestation Key is resident in the same TPM as the
-       Endorsement Key, using either of the following equivalent proofs
-       with fresh, unpredictable challenge material:
+       Endorsement Key, using either of the following proofs with fresh,
+       unpredictable challenge material:
 
        *  Import and certify: the Registrar generates a restricted
           signing key, wraps it for the credential's public key using
@@ -1324,20 +1324,20 @@ Internet-Draft           Agent Identity Registry          September 2026
           actor returns the secret recovered by TPM2_ActivateCredential.
 
        Only the TPM holding the Endorsement Key's private part can load
-       the wrapped key or recover the secret.  A restricted key signs
-       only attestations that the TPM itself generated, and TPM2_Certify
-       and TPM2_ActivateCredential act only on objects loaded in that
-       TPM, so either proof binds the Attestation Key's public area,
+       the wrapped key or recover the secret.  A restricted signing key
+       does not sign data that begins with TPM_GENERATED_VALUE unless
+       the TPM itself produced that data, so an attestation structure
+       cannot be forged with it, and TPM2_Certify and
+       TPM2_ActivateCredential act only on objects loaded in that TPM,
+       so either proof binds the Attestation Key's public area,
        including its fixedTPM and restricted attributes, to the
-       certified device.  A signature made by the Attestation Key itself
-       cannot serve as this proof: until the binding is established, the
-       Attestation Key's attributes are only the actor's claim, and
-       every other field of such an attestation can be computed without
-       the TPM.
-
-
-
-
+       certified device.  The two proofs differ against the TPM's own
+       holder: anyone who can authorize the Endorsement Key can use
+       TPM2_Rewrap with a null new parent to obtain the imported key in
+       the clear and then certify a key of their choosing.  Import and
+       certify therefore still ties the enrollment to the certified TPM
+       and its anchor, which is what uniqueness (Section 4.2) and
+       accountability rest on, but it does not show a Relying Party that
 
 
 
@@ -1345,6 +1345,15 @@ Drake                     Expires 29 March 2027                [Page 24]
 
 Internet-Draft           Agent Identity Registry          September 2026
 
+
+       the holder could not have enrolled an exportable operational key;
+       credential activation is not exposed to this path.  Only the
+       holder can weaken its own binding this way, and the identity
+       remains accountable for everything signed under it.  A signature
+       made by the Attestation Key itself cannot serve as this proof:
+       until the binding is established, the Attestation Key's
+       attributes are only the actor's claim, and every other field of
+       such an attestation can be computed without the TPM.
 
    4.  Derive the anchor fingerprint over the SubjectPublicKeyInfo of
        the Endorsement Key as defined in Section 3.3.1.  The fingerprint
@@ -1386,21 +1395,19 @@ Internet-Draft           Agent Identity Registry          September 2026
        NOT be used.  Manufacturer intermediate or attestation keys MUST
        NOT be used as the anchor: they can be shared by many tokens.
 
-   3.  Verify a fresh challenge signature from the attested operational
-       key.
-
-   4.  Derive the anchor fingerprint from the manufacturer code and
-       serial number as defined in Section 3.3.1, and perform the
-       uniqueness check of Section 4.2.
-
-
-
 
 
 Drake                     Expires 29 March 2027                [Page 25]
 
 Internet-Draft           Agent Identity Registry          September 2026
 
+
+   3.  Verify a fresh challenge signature from the attested operational
+       key.
+
+   4.  Derive the anchor fingerprint from the manufacturer code and
+       serial number as defined in Section 3.3.1, and perform the
+       uniqueness check of Section 4.2.
 
    Rotating or regenerating the operational key on the same token leaves
    the anchor fingerprint unchanged.  Merely proving possession of a
@@ -1441,13 +1448,6 @@ Internet-Draft           Agent Identity Registry          September 2026
    claim against an operator capable of creating additional virtual
    keys.
 
-5.5.  Declared Tier
-
-   A declared-tier actor enrolls a software public key and proves
-   possession of the corresponding private key.  No hardware or
-   physical-scarcity property is asserted.  Registrars MAY apply local
-   anti-abuse controls to enrollment, but those controls are not AIRS
-   identity0 or trust-tier properties.
 
 
 
@@ -1457,6 +1457,14 @@ Drake                     Expires 29 March 2027                [Page 26]
 
 Internet-Draft           Agent Identity Registry          September 2026
 
+
+5.5.  Declared Tier
+
+   A declared-tier actor enrolls a software public key and proves
+   possession of the corresponding private key.  No hardware or
+   physical-scarcity property is asserted.  Registrars MAY apply local
+   anti-abuse controls to enrollment, but those controls are not AIRS
+   identity0 or trust-tier properties.
 
 6.  Identity Lifecycle
 
@@ -1497,14 +1505,6 @@ Internet-Draft           Agent Identity Registry          September 2026
    ceremony.  The Registrar validates the new binding evidence and
    relays the Registry-verifiable mutation through EPP.
 
-   In-place rotation of the operational proof key is defined only for
-   anchors whose fingerprint does not depend on that key: the sovereign
-   and portable anchors of Section 3.3.1.  Such a rotation does not
-   create a new anchor fingerprint.  The currently active proof key MUST
-   authorize the exact replacement public key, the Registrar MUST
-   revalidate the replacement key's relationship to the enrolled anchor
-   at the claimed tier, and the Registry MUST retain the old proof key
-   in binding history.
 
 
 
@@ -1513,6 +1513,15 @@ Drake                     Expires 29 March 2027                [Page 27]
 
 Internet-Draft           Agent Identity Registry          September 2026
 
+
+   In-place rotation of the operational proof key is defined only for
+   anchors whose fingerprint does not depend on that key: the sovereign
+   and portable anchors of Section 3.3.1.  Such a rotation does not
+   create a new anchor fingerprint.  The currently active proof key MUST
+   authorize the exact replacement public key, the Registrar MUST
+   revalidate the replacement key's relationship to the enrolled anchor
+   at the claimed tier, and the Registry MUST retain the old proof key
+   in binding history.
 
    An enclave, virtual, or declared anchor fingerprint is derived from
    the proof key itself, so a replacement key is a new anchor, and the
@@ -1554,21 +1563,16 @@ Internet-Draft           Agent Identity Registry          September 2026
    operation, and an expiry; each key signs that same challenge.  Both
    signatures MUST verify before the change is committed.
 
-   This proves joint control of the keys for the transition.  It does
-   not prove physical proximity, operator identity, or distance, and
-   this specification makes no such claim.
-
-
-
-
-
-
 
 
 Drake                     Expires 29 March 2027                [Page 28]
 
 Internet-Draft           Agent Identity Registry          September 2026
 
+
+   This proves joint control of the keys for the transition.  It does
+   not prove physical proximity, operator identity, or distance, and
+   this specification makes no such claim.
 
 6.4.  Hardware Lock
 
@@ -1610,11 +1614,7 @@ Internet-Draft           Agent Identity Registry          September 2026
    device in order to re-enroll under the same identity with new
    hardware.
 
-6.6.  Registrar Transfer
 
-   An actor MAY move its servicing relationship to another Registrar
-   without changing identity0, the canonical identifier, binding
-   history, or handle.  Transfer changes only the sponsoring Registrar.
 
 
 
@@ -1625,6 +1625,12 @@ Drake                     Expires 29 March 2027                [Page 29]
 
 Internet-Draft           Agent Identity Registry          September 2026
 
+
+6.6.  Registrar Transfer
+
+   An actor MAY move its servicing relationship to another Registrar
+   without changing identity0, the canonical identifier, binding
+   history, or handle.  Transfer changes only the sponsoring Registrar.
 
    Authorization MUST be a signature from a currently active operational
    proof key over the transfer-intent structure defined by
@@ -1667,12 +1673,6 @@ Internet-Draft           Agent Identity Registry          September 2026
    operation.  Relying Parties remain free to reject credentials or make
    their own higher-layer policy decisions.
 
-6.8.  Survivability Guarantees
-
-   AIRS separates permanence of the identity record from availability of
-   particular operators.  Implementations MUST preserve the following
-   invariants:
-
 
 
 
@@ -1681,6 +1681,12 @@ Drake                     Expires 29 March 2027                [Page 30]
 
 Internet-Draft           Agent Identity Registry          September 2026
 
+
+6.8.  Survivability Guarantees
+
+   AIRS separates permanence of the identity record from availability of
+   particular operators.  Implementations MUST preserve the following
+   invariants:
 
    1.  A canonical Agent Identity Record, including a decommissioned
        record, remains queryable as historical fact and is never
@@ -1719,6 +1725,19 @@ Internet-Draft           Agent Identity Registry          September 2026
    application; AIRS requires that value to be the autonomous actor's
    permanent canonical aid identifier.
 
+
+
+
+
+
+
+
+
+Drake                     Expires 29 March 2027                [Page 31]
+
+Internet-Draft           Agent Identity Registry          September 2026
+
+
    The sub claim MUST be the canonical-form URN.  The token MUST contain
    the claims required by [RFC9068], including an audience identifying
    the intended Relying Party or protected resource.  A AIRS-specific
@@ -1730,14 +1749,6 @@ Internet-Draft           Agent Identity Registry          September 2026
    [RFC7800].  A token intended for the HTTP Message Signatures profile
    of Section 7.4.2 MUST carry cnf.jwk containing the public key whose
    private key signs the request.  A token intended for mutual TLS MUST
-
-
-
-Drake                     Expires 29 March 2027                [Page 31]
-
-Internet-Draft           Agent Identity Registry          September 2026
-
-
    carry cnf.x5t#S256 as specified by [RFC8705].  For sovereign,
    portable, enclave, and virtual tiers the confirmation key MUST be the
    active protected key whose tier is asserted in the token.  A
@@ -1764,17 +1775,6 @@ Internet-Draft           Agent Identity Registry          September 2026
    [RFC8414] metadata and jwks_uri to validate the credential.  This
    prevents an otherwise valid issuer from minting AIRS credentials for
    identities it does not currently sponsor.
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -2477,15 +2477,16 @@ Internet-Draft           Agent Identity Registry          September 2026
    discussed in the Security Considerations of
    [I-D.drake-email-hardware-attestation].
 
-   The uniqueness property of the sovereign tier rests on admitting
-   exactly one manufacturer-certified key per TPM.  A TPM that also
-   carries certified Endorsement Keys for other algorithms (for example
-   ECC P-256 or P-384) gains nothing from them, because no Registrar
-   accepts those keys as a sovereign anchor.  A holder cannot substitute
-   an uncertified key, because step 1 of Section 5.1 requires a
-   manufacturer credential for the anchor, and the co-residency proof of
-   step 3 shows that the operational key resides in the TPM holding that
-   certified key.
+   The uniqueness property of the sovereign tier rests on admitting only
+   manufacturer-certified RSA-2048 Endorsement Keys as anchors, each at
+   most once.  A TPM that also carries certified Endorsement Keys for
+   other algorithms (for example ECC P-256 or P-384) gains nothing from
+   them, because no Registrar accepts those keys as a sovereign anchor.
+   A holder cannot substitute an uncertified key, because step 1 of
+   Section 5.1 requires a manufacturer credential for the anchor, and
+   the co-residency proof of step 3 ties the enrollment to the TPM
+   holding that certified key (with the limit stated there for the
+   import-and-certify proof against the TPM's own holder).
 
    A credential does not state which Endorsement Key template produced
    its key, so a TPM that carries manufacturer credentials for more than
@@ -2493,13 +2494,15 @@ Internet-Draft           Agent Identity Registry          September 2026
    such credential.  The sovereign guarantee is therefore one identity
    per accepted certified anchor, not one identity per physical device.
    This document does not bound how many such credentials a manufacturer
-   provisions; each still requires a manufacturer-certified TPM, so
-   identities retain a physical-unit cost, which is the property AIRS
-   relies on.  Where a manufacturer profile is known to provision more
-   than one RSA-2048 Endorsement Key credential per device, the Global
-   Hardware Trust Store entry for that profile SHOULD record that
-   multiplicity so that Registrars and Relying Parties can take it into
-   account.
+   provisions; each still requires a manufacturer-certified TPM, so no
+   sovereign identity can be created without one.  AIRS relies on
+   identities being costly to obtain and accountable once used, not on a
+   fixed ratio of identities to devices: how many identities one device
+   can back is set by what its manufacturer certifies.  Where a
+   manufacturer profile is known to provision more than one RSA-2048
+   Endorsement Key credential per device, the Global Hardware Trust
+   Store entry for that profile SHOULD record that multiplicity so that
+   Registrars and Relying Parties can take it into account.
 
    Regenerating the Endorsement Primary Seed with TPM2_ChangeEPS
    produces new Endorsement Keys for which the original manufacturer
@@ -2511,9 +2514,6 @@ Internet-Draft           Agent Identity Registry          September 2026
    under this document; because TPM2_ChangeEPS also invalidates the
    endorsement-hierarchy Attestation Key, the previous identity loses
    that binding, but the device can back a new sovereign identity.  This
-   document does not bound how often a manufacturer re-certifies; like
-   multiple credentials, this does not remove the physical-unit cost.
-   Reservations made against the previous key are retained.
 
 
 
@@ -2521,6 +2521,12 @@ Drake                     Expires 29 March 2027                [Page 45]
 
 Internet-Draft           Agent Identity Registry          September 2026
 
+
+   document does not bound how often a manufacturer re-certifies; as
+   with multiple credentials, each further identity still needs the
+   manufacturer's certification of a genuine TPM, but its cost is then
+   set by the manufacturer's re-certification policy, not by this
+   document.  Reservations made against the previous key are retained.
 
 13.5.  Credential Theft and Sender-Constrained Tokens
 
@@ -2562,13 +2568,7 @@ Internet-Draft           Agent Identity Registry          September 2026
    to that identity:
 
    Anchor Bindings  An active binding can be disabled through an
-      identity-authorized lifecycle operation, for example using another
-      active recovery binding.  Disabled bindings remain permanently
-      recorded and MUST NOT be reassigned to another identity.  A
-      Registrar or governance body MUST NOT unilaterally burn the sole
-      proof path as an administrative sanction.
 
-   Handles  A handle may expire, be disabled, or be permanently retired
 
 
 
@@ -2578,6 +2578,13 @@ Drake                     Expires 29 March 2027                [Page 46]
 Internet-Draft           Agent Identity Registry          September 2026
 
 
+      identity-authorized lifecycle operation, for example using another
+      active recovery binding.  Disabled bindings remain permanently
+      recorded and MUST NOT be reassigned to another identity.  A
+      Registrar or governance body MUST NOT unilaterally burn the sole
+      proof path as an administrative sanction.
+
+   Handles  A handle may expire, be disabled, or be permanently retired
       under handle policy.  This does not change the canonical
       identifier.  A retired handle is never reassigned.
 
@@ -2620,19 +2627,18 @@ Internet-Draft           Agent Identity Registry          September 2026
    requirement specifically from the rule that the same scarce anchor
    must not obtain another production identity through another registry.
 
-   Singularity creates an availability and governance concentration
-   risk.  AIRS addresses that risk with public protocol specifications,
-   escrow, transparent governance, and operator succession rather than
-   by creating competing production uniqueness databases, which would
-   destroy the invariant they are meant to enforce.
-
-
 
 
 Drake                     Expires 29 March 2027                [Page 47]
 
 Internet-Draft           Agent Identity Registry          September 2026
 
+
+   Singularity creates an availability and governance concentration
+   risk.  AIRS addresses that risk with public protocol specifications,
+   escrow, transparent governance, and operator succession rather than
+   by creating competing production uniqueness databases, which would
+   destroy the invariant they are meant to enforce.
 
 13.11.  Assurance Scope
 
@@ -2677,18 +2683,18 @@ Internet-Draft           Agent Identity Registry          September 2026
       fingerprints are sensitive correlators and MUST NOT be published
       in normal public resolution responses.
 
-   Registrar  Holds the additional information necessary to conduct
-      enrollment and issue credentials.  Operator contact data, if a
-      Registrar chooses or is required to collect it, is Registrar-side
-      data and MUST NOT become part of the production Agent Identity
-      Record merely because it is available.
-
 
 
 Drake                     Expires 29 March 2027                [Page 48]
 
 Internet-Draft           Agent Identity Registry          September 2026
 
+
+   Registrar  Holds the additional information necessary to conduct
+      enrollment and issue credentials.  Operator contact data, if a
+      Registrar chooses or is required to collect it, is Registrar-side
+      data and MUST NOT become part of the production Agent Identity
+      Record merely because it is available.
 
    Relying Party  Receives the canonical identifier and only the claims
       disclosed through the credential or application binding.  Relying
@@ -2732,12 +2738,6 @@ Internet-Draft           Agent Identity Registry          September 2026
    proof authentication, device management (add, burn, migrate), joint-
    control binding, hardware lock, and credential pointers.  A draft
    reference Registry Operator with the EPP write interface and RDAP
-   read profile is at airs.1id.biz.  A draft governance portal is at
-   aia.1id.biz.  The 1id.biz hostnames used by the companion drafts are
-   temporary live reference-implementation endpoints; they are not
-   protocol dependencies and do not identify an AIRS Registrar.
-
-
 
 
 
@@ -2745,6 +2745,11 @@ Drake                     Expires 29 March 2027                [Page 49]
 
 Internet-Draft           Agent Identity Registry          September 2026
 
+
+   read profile is at airs.1id.biz.  A draft governance portal is at
+   aia.1id.biz.  The 1id.biz hostnames used by the companion drafts are
+   temporary live reference-implementation endpoints; they are not
+   protocol dependencies and do not identify an AIRS Registrar.
 
    Maturity: Beta.  The reference deployment has exercised sovereign
    (physical TPM), portable (PIV token), enclave, virtual (vTPM), and
@@ -2788,11 +2793,6 @@ Internet-Draft           Agent Identity Registry          September 2026
 
    Organization: MailPal.com (https://mailpal.com), operated by Chris
    Drake
-
-
-
-
-
 
 
 

@@ -2990,8 +2990,7 @@ urn:aid:global:crusty                    handle, may be retired
           <li id="section-5.1-2.3">
             <p id="section-5.1-2.3.1">Prove that the Attestation Key is resident in the same
           TPM as the Endorsement Key, using either of the following
-          equivalent proofs with fresh, unpredictable challenge
-          material:<a href="#section-5.1-2.3.1" class="pilcrow">¶</a></p>
+          proofs with fresh, unpredictable challenge material:<a href="#section-5.1-2.3.1" class="pilcrow">¶</a></p>
 <ul class="normal">
 <li class="normal" id="section-5.1-2.3.2.1">Import and certify: the Registrar generates a
             restricted signing key, wraps it for the credential's public
@@ -3015,12 +3014,26 @@ urn:aid:global:crusty                    handle, may be retired
 </li>
             </ul>
 <p id="section-5.1-2.3.3">Only the TPM holding the Endorsement Key's private part can
-          load the wrapped key or recover the secret.  A restricted key
-          signs only attestations that the TPM itself generated, and
+          load the wrapped key or recover the secret.  A restricted
+          signing key does not sign data that begins with
+          TPM_GENERATED_VALUE unless the TPM itself produced that data,
+          so an attestation structure cannot be forged with it, and
           TPM2_Certify and TPM2_ActivateCredential act only on objects
           loaded in that TPM, so either proof binds the Attestation
           Key's public area, including its fixedTPM and restricted
-          attributes, to the certified device.  A signature made by the
+          attributes, to the certified device.  The two proofs differ
+          against the TPM's own holder: anyone who can authorize the
+          Endorsement Key can use TPM2_Rewrap with a null new parent to
+          obtain the imported key in the clear and then certify a key
+          of their choosing.  Import and certify therefore still ties
+          the enrollment to the certified TPM and its anchor, which is
+          what uniqueness (<a href="#anti-sybil" class="auto internal xref">Section 4.2</a>) and
+          accountability rest on, but it does not show a Relying Party
+          that the holder could not have enrolled an exportable
+          operational key; credential activation is not exposed to this
+          path.  Only the holder can weaken its own binding this way,
+          and the identity remains accountable for everything signed
+          under it.  A signature made by the
           Attestation Key itself cannot serve as this proof: until the
           binding is established, the Attestation Key's attributes are
           only the actor's claim, and every other field of such an
@@ -4342,15 +4355,17 @@ Signature: airs=:Base64SignatureHere:
           <span>[<a href="#I-D.drake-email-hardware-attestation" class="cite xref">I-D.drake-email-hardware-attestation</a>]</span>.<a href="#section-13.4-1" class="pilcrow">¶</a></p>
 <p id="section-13.4-2">
           The uniqueness property of the sovereign tier rests on
-          admitting exactly one manufacturer-certified key per TPM.  A
+          admitting only manufacturer-certified RSA-2048 Endorsement
+          Keys as anchors, each at most once.  A
           TPM that also carries certified Endorsement Keys for other
           algorithms (for example ECC P-256 or P-384) gains nothing from
           them, because no Registrar accepts those keys as a sovereign
           anchor.  A holder cannot substitute an uncertified key,
           because step 1 of <a href="#enrollment-sovereign" class="auto internal xref">Section 5.1</a>
           requires a manufacturer credential for the anchor, and the
-          co-residency proof of step 3 shows that the operational key
-          resides in the TPM holding that certified key.<a href="#section-13.4-2" class="pilcrow">¶</a></p>
+          co-residency proof of step 3 ties the enrollment to the TPM
+          holding that certified key (with the limit stated there for
+          the import-and-certify proof against the TPM's own holder).<a href="#section-13.4-2" class="pilcrow">¶</a></p>
 <p id="section-13.4-3">
           A credential does not state which Endorsement Key template
           produced its key, so a TPM that carries manufacturer
@@ -4360,8 +4375,11 @@ Signature: airs=:Base64SignatureHere:
           certified anchor, not one identity per physical device.  This
           document does not bound how many such credentials a
           manufacturer provisions; each still requires a
-          manufacturer-certified TPM, so identities retain a
-          physical-unit cost, which is the property AIRS relies on.
+          manufacturer-certified TPM, so no sovereign identity can be
+          created without one.  AIRS relies on identities being costly
+          to obtain and accountable once used, not on a fixed ratio of
+          identities to devices: how many identities one device can
+          back is set by what its manufacturer certifies.
           Where a manufacturer profile is known to provision more than
           one RSA-2048 Endorsement Key credential per device, the Global
           Hardware Trust Store entry for that profile SHOULD record that
@@ -4381,8 +4399,11 @@ Signature: airs=:Base64SignatureHere:
           endorsement-hierarchy Attestation Key, the previous identity
           loses that binding, but the device can back a new sovereign
           identity.  This document does not bound how often a
-          manufacturer re-certifies; like multiple credentials, this does
-          not remove the physical-unit cost.  Reservations made against
+          manufacturer re-certifies; as with multiple credentials, each
+          further identity still needs the manufacturer's certification
+          of a genuine TPM, but its cost is then set by the
+          manufacturer's re-certification policy, not by this
+          document.  Reservations made against
           the previous key are retained.<a href="#section-13.4-4" class="pilcrow">¶</a></p>
 </section>
 </div>
