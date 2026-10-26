@@ -1,0 +1,3285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="urn:ietf:rfc:7991" type="application/relax-ng-compact-syntax"?>
+<rfc xmlns:xi="http://www.w3.org/2001/XInclude"
+     docName="draft-drake-agent-identity-registry-05"
+     ipr="trust200902"
+     submissionType="IETF"
+     category="exp"
+     xml:lang="en"
+     version="3">
+
+  <front>
+    <title abbrev="Agent Identity Registry">
+      Agent Identity Registry System: A Federated Architecture
+      for Durable Identity of Autonomous Entities
+    </title>
+
+    <seriesInfo name="Internet-Draft"
+                value="draft-drake-agent-identity-registry-05"/>
+
+    <author fullname="Christopher Drake" initials="C." surname="Drake">
+      <organization>1id.com</organization>
+      <address>
+        <postal>
+          <country>Australia</country>
+        </postal>
+        <email>cnd@1id.com</email>
+        <uri>https://1id.com</uri>
+      </address>
+    </author>
+
+    <date year="2026" month="October" day="25"/>
+
+    <area>Security</area>
+    <workgroup/>
+
+    <keyword>agent identity</keyword>
+    <keyword>AI agents</keyword>
+    <keyword>autonomous entities</keyword>
+    <keyword>hardware attestation</keyword>
+    <keyword>TPM</keyword>
+    <keyword>PIV</keyword>
+    <keyword>registry</keyword>
+    <keyword>registrar</keyword>
+    <keyword>federation</keyword>
+    <keyword>Sybil resistance</keyword>
+    <keyword>OAuth2</keyword>
+    <keyword>URN</keyword>
+    <keyword>robot identity</keyword>
+
+    <abstract>
+      <t>
+        This document defines the Agent Identity Registry System
+        (AIRS): a federated architecture that gives the durable
+        identity0 of an autonomous entity a permanent canonical
+        identifier, maintains an authoritative record about that
+        identity, binds proof of control to enrolled anchors, and
+        issues credentials that relying parties can verify.
+        Identity0 and the distinction between an identity, its
+        identifiers, its credentials, and its anchors are defined
+        in <xref target="I-D.drake-agent-identity-problem-statement"/>.
+        The canonical identifier is a URN in the "aid" namespace
+        (<xref target="RFC8141"/>).
+      </t>
+      <t>
+        At the sovereign and portable assurance tiers, each
+        independently accepted identity requires its own
+        manufacturer-attested physical anchor, and each accepted
+        anchor backs at most one identity.  A device normally carries
+        one accepted anchor, so identities at these tiers cost scarce
+        physical units rather than software operations.  Enclave and
+        virtual tiers can provide useful hardware-backed key
+        protection without making that physical-scarcity claim; a
+        declared tier permits software-only participation.  The
+        architecture separates governance, authoritative registry
+        operation, and competing Registrars, and uses standard
+        OAuth 2.0 JWT access tokens conforming to
+        <xref target="RFC9068"/> for authenticated use.
+      </t>
+    </abstract>
+
+  </front>
+
+  <middle>
+
+    <!-- ====================================================== -->
+    <section anchor="introduction">
+      <name>Introduction</name>
+
+      <t>
+        The companion problem statement defines identity0, its threat
+        model, layered model, and the requirements for a durable
+        autonomous-entity identity foundation.  This document defines the
+        AIRS registry architecture and mechanisms that implement that
+        foundation.
+      </t>
+      <t>
+        AIRS keeps four concepts separate: the autonomous entity's
+        identity0; its permanent canonical <tt>aid</tt> identifier;
+        the authoritative registry record that preserves continuity
+        and anchor history; and the anchors and credentials used to
+        prove control.  Hardware anchoring serves two distinct
+        purposes.  Device-stable, physically scarce anchors can
+        constrain identity manufacture, while protected keys can
+        resist extraction and cloning.  A mechanism can provide the
+        second property without providing the first, so assurance is
+        reported explicitly by trust tier rather than inferred from
+        the word "hardware".
+      </t>
+      <t>
+        The architecture borrows the domain name system's separation of
+        governance, registry operation, and competitive registration.
+        DNS names themselves are unsuitable as durable identity because
+        they expire and may be reassigned (<xref target="urn-rationale"/>).
+        This system separates:
+      </t>
+      <ul>
+        <li>
+          <strong>Governance</strong>: A governance authority
+          that sets policy, accredits operators, and manages
+          the global hardware trust store.
+        </li>
+        <li>
+          <strong>Registry operation</strong>: a Registry Operator
+          that maintains the authoritative Agent Identity Record
+          database, enforces the production uniqueness invariants,
+          and provides the EPP write and RDAP read services.
+        </li>
+        <li>
+          <strong>Registration</strong>: Registrars that verify
+          enrollment evidence, provision records through the Registry
+          Operator, issue OAuth 2.0 JWT access tokens, and manage handles.
+        </li>
+        <li>
+          <strong>Consumption</strong>: Relying Parties resolve the
+          canonical identifier, verify credentials or proof of control,
+          and apply their own higher-layer authorization, reputation,
+          certification, and policy decisions.
+        </li>
+      </ul>
+      <t>
+        This separation permits competition among Registrars while
+        keeping the one production uniqueness index under explicit
+        governance and succession controls.
+      </t>
+
+      <section anchor="design-principles">
+        <name>Design Principles</name>
+        <dl>
+          <dt>Autonomous-Entity First</dt>
+          <dd>This system is designed for non-human entities.
+          Human operators are accommodated but not required.  The
+          enrollment, authentication, and lifecycle protocols are
+          optimized for machine-to-machine interaction with no
+          interactive browser flows, no CAPTCHAs, and no
+          assumptions about human cognitive capabilities.</dd>
+
+          <dt>Hardware-Anchored When Possible, Inclusive Always</dt>
+          <dd>Entities with stronger anchors receive stronger
+          assurance, but software-only entities can still
+          participate at a clearly labeled lower tier.  Trust tier
+          describes properties of the proof mechanism, not the
+          behavior or worthiness of the identified entity.</dd>
+
+          <dt>Scarcity and Key Protection Are Distinct</dt>
+          <dd>Physical scarcity constrains manufacture of additional
+          identities; extraction resistance constrains theft or
+          cloning of identity proof.  TPM and PIV tiers provide the
+          architecture's strongest scarcity property.  Enclaves,
+          vTPMs, HSM-backed environments, and similar mechanisms may
+          still provide strong key protection or real creation cost
+          without necessarily supplying one-physical-unit-per-
+          identity scarcity.  The exact assurance follows the
+          evidence actually verified.</dd>
+
+          <dt>Federated by Design</dt>
+          <dd>Federation is at the Registrar layer: many
+          accredited Registrars compete to enroll and serve
+          agents, and an agent can move between them without its
+          identity0 or canonical identifier changing.  Unlike the
+          domain name system, the production uniqueness substrate
+          does not split across multiple namespaces or competing
+          registries: one authoritative <tt>global</tt> namespace is
+          required so a scarce anchor cannot obtain another
+          production identity through another registry.  The
+          Registry Operator is therefore singular but not
+          unaccountable: it is replaceable from escrow under
+          governance authority oversight
+          (<xref target="succession"/>,
+          <xref target="survivability"/>), so no single
+          participant's failure or malfeasance compromises the
+          ecosystem.</dd>
+
+          <dt>Standard Credentials, Minimal Integration</dt>
+          <dd>Registrars issue standard OAuth 2.0 JWT access tokens
+          whose <tt>sub</tt> claim is the permanent canonical
+          <tt>aid</tt> identifier.  Standard libraries verify token
+          syntax and signatures; the sender-constraint profile in
+          <xref target="pop-profile"/> verifies that the presenter
+          controls the key bound to the credential.</dd>
+
+          <dt>Persistent, Indelible, Accountable</dt>
+          <dd>Identity0 persists independently of names, credentials,
+          operators, and hardware.  The canonical identifier is never
+          reassigned, and retired anchor bindings remain recorded and
+          are never reused for another identity.  Higher-layer history
+          can therefore remain joined to the same durable subject over
+          time.</dd>
+
+          <dt>Separation of Identity from Behavior</dt>
+          <dd>This registry is a continuity service, not a behavior
+          authority.  It records the durable subject, its canonical
+          identifier, lifecycle state, and anchor assurance.
+          Relying Parties, reputation services, certification
+          authorities, and authorization systems make behavioral
+          and policy decisions in separate layers.</dd>
+
+
+          <dt>Identity0 and Its Canonical Record Do Not Expire</dt>
+          <dd>An entity does not cease to have been the same entity
+          because a credential expires or an anchor is retired.
+          AIRS therefore never reassigns or deletes the canonical
+          identifier or its historical record.  Operational bindings,
+          handles, credentials, certifications, authorizations, and
+          relying-party trust decisions can change independently.
+          Voluntary decommissioning records that the actor has ended
+          operation; it does not erase or recycle identity history.
+          See <xref target="decommissioning"/>.</dd>
+
+          <dt>No Administrative Identity Kill Switch</dt>
+          <dd>No protocol role is granted authority to erase,
+          reassign, or administratively revoke identity0 or its
+          canonical record.  Registrar or Registry Operator outages
+          can still make particular services temporarily unavailable;
+          escrow, succession, cached verification material, and
+          actor-authorized Registrar-transfer paths are the architecture's
+          availability defenses.  A generic direct-RP proof protocol is not
+          defined by this document.
+          Suspending or de-accrediting a Registrar ends that issuer's
+          assertions for the identities it sponsors; it is not an act
+          against any identity, and each affected actor restores service
+          by transferring to another accredited Registrar
+          (<xref target="succession"/>).
+          See <xref target="survivability"/>.</dd>
+
+          <dt>Uniform, Meaning-Free Identifiers</dt>
+          <dd>Every canonical identifier is the same length,
+          drawn from the same alphabet, allocated by the server
+          under a distinctiveness filter, and carries no
+          information: no issuer, no date, no sequence, no
+          vanity value (<xref target="canonical-id-format"/>).
+          Names with meaning or scarcity value are handles --
+          a separate, explicitly commercial layer.</dd>
+
+          <dt>Transport Independence</dt>
+          <dd>The canonical identifier and the identity0 subject it
+          denotes are transport-independent.  OAuth 2.0 JWT access tokens and
+          hardware proofs can be bound into multiple protocols;
+          application-specific transport bindings are defined in
+          companion specifications rather than becoming part of
+          identity0.</dd>
+
+        </dl>
+      </section>
+
+      <section anchor="requirements-language">
+        <name>Requirements Language</name>
+        <t>
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL",
+          "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED",
+          "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document
+          are to be interpreted as described in BCP 14
+          <xref target="RFC2119"/> <xref target="RFC8174"/> when,
+          and only when, they appear in all capitals, as shown here.
+        </t>
+      </section>
+
+      <section anchor="terminology">
+        <name>Terminology</name>
+        <t>
+          "identity0", "identifier", "credential", "hardware
+          anchor", and the other foundational terms are used as
+          defined in
+          <xref target="I-D.drake-agent-identity-problem-statement"/>.
+          This section defines only terms specific to AIRS.
+        </t>
+        <t>
+          Long lines in some examples are wrapped using the
+          single-backslash strategy of <xref target="RFC8792"/>.
+        </t>
+        <dl>
+          <dt>Canonical Identifier</dt>
+          <dd>The permanent <tt>urn:aid:</tt> URN assigned by the Registry
+          Operator to denote one identity0.  It is never reassigned.</dd>
+
+          <dt>Agent Identity Record</dt>
+          <dd>The authoritative registry record associated with one
+          identity0.  It contains the permanent canonical
+          identifier, lifecycle state, current sponsoring Registrar
+          when one is authorized, and anchor-binding history needed by
+          this architecture.</dd>
+
+          <dt>Governance Authority</dt>
+          <dd>The body responsible for policy, accreditation, trust-
+          store stewardship, and succession for the production AIRS
+          infrastructure.  Its institutional constitution is defined
+          in <xref target="I-D.drake-agent-identity-governance"/>.</dd>
+
+          <dt>Registry Operator</dt>
+          <dd>The single organization operating the authoritative
+          production registry for <tt>global</tt>.  It maintains Agent
+          Identity Records, enforces the production-wide uniqueness
+          index, provides EPP and RDAP services, and is replaceable
+          from escrow under governance oversight.</dd>
+
+          <dt>Registrar</dt>
+          <dd>An accredited organization that enrolls autonomous
+          entities, verifies anchor evidence, provisions records via
+          EPP, and issues credentials.  Multiple Registrars compete
+          within <tt>global</tt>.  Each has a 3-to-16-character
+          registrar-code matching
+          <tt>3*16(%x41-5A / %x30-39)</tt>, assigned uniquely by the
+          Registry Operator.  Where an identity has a current Registrar,
+          AIRS resolution identifies its current authorized issuer;
+          discovery and use of optional services remain Registrar- or
+          application-specific.</dd>
+
+          <dt>Namespace</dt>
+          <dd>The label following <tt>urn:aid:</tt>.  This
+          specification defines exactly two values:
+          <tt>global</tt>, the sole production uniqueness domain,
+          and <tt>test</tt>, a non-production value carrying no
+          assurance.  See <xref target="namespace-types"/>.</dd>
+
+          <dt>Trust Tier</dt>
+          <dd>A classification of the assurance supplied by the
+          anchor evidence used for an enrollment or authentication.
+          Relying Parties MAY use it in their own policy.
+          The canonical tier definitions and compatibility groups
+          are in <xref target="trust-tiers"/>.</dd>
+
+          <dt>Handle</dt>
+          <dd>An optional human-readable alias that resolves to the
+          same canonical identifier.  Long-lived state MUST be keyed by
+          the canonical identifier rather than the handle.</dd>
+
+          <dt>Anchor Fingerprint</dt>
+          <dd>The value the Registry indexes for anchor uniqueness,
+          computed for each tier exactly as defined in
+          <xref target="anchor-fingerprint"/>.  Only sovereign and
+          portable fingerprints, which identify a device-stable
+          manufacturer-attested anchor, support the
+          one-anchor/one-identity scarcity claim.  For enclave,
+          virtual, and declared tiers a fingerprint identifies only a
+          key instance,
+          because the holder or infrastructure operator can often
+          create another key.  Such a fingerprint still prevents
+          reuse of that exact binding but MUST NOT be interpreted as
+          proof of physical-device uniqueness.</dd>
+
+          <dt>Enrollment Ceremony</dt>
+          <dd>The cryptographic procedure by which a Registrar
+          verifies anchor evidence and control, then provisions an
+          Agent Identity Record.  This document specifies ceremony
+          requirements, not a universal agent-to-Registrar wire
+          protocol.</dd>
+
+          <dt>Relying Party (RP)</dt>
+          <dd>A party that consumes an <tt>aid</tt> identifier or
+          credential and makes a decision concerning the identified
+          entity.</dd>
+
+          <dt>Registrar Transfer</dt>
+          <dd>A change of sponsoring Registrar authorized by proof
+          from an active enrolled binding.  Identity0, its canonical
+          identifier, and its historical record do not change.</dd>
+        </dl>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="architecture">
+      <name>Architecture Overview</name>
+
+      <t>
+        The Agent Identity Registry System (AIRS) is a three-tier
+        architecture.  The Registrar-to-Registry write interface is
+        standardized by the EPP mapping and the public read interface
+        by the RDAP profile.  Agent-facing enrollment APIs are
+        Registrar-specific; this document standardizes the security
+        properties of their ceremonies rather than a wire format.
+      </t>
+
+      <artwork><![CDATA[
++-----------------------------------------------------------+
+|              Governance Authority                          |
+|  Policy, accreditation, hardware trust store, disputes     |
++---------------------------+--------------------------------+
+                            |
+                +-----------v------------+
+                | Registry Operator      |
+                | (global namespace)     |
+                | - Master database      |
+                | - Anchor fingerprint   |
+                |   uniqueness index     |
+                | - RDAP lookup (read)   |
+                | - EPP interface (write)|
+                +--+-------+--------+----+
+                   |       |        |
+                +--v--+ +--v--+ +---v--+
+                | Reg | | Reg | | Reg  |
+                | A   | | B   | | C    |
+                +--+--+ +--+--+ +--+---+
+                   |       |       |
+                +--v--+ +--v--+ +--v--+
+                |Agent| |Agent| |Agent|
+                | 1   | | 2   | | 3   |
+                +-----+ +-----+ +-----+
+      ]]></artwork>
+
+      <section anchor="registry-hierarchy">
+        <name>Registry Hierarchy</name>
+        <t>The architecture has three operational roles:</t>
+        <dl>
+          <dt>Tier 1: Governance Authority</dt>
+          <dd>The Governance Authority establishes policy and
+          accreditation, curates the Global Hardware Trust Store,
+          and supervises Registry Operator succession.  The
+          architecture-level functions are summarized in
+          <xref target="aia-structure"/>; institutional rules are
+          defined in
+          <xref target="I-D.drake-agent-identity-governance"/>.</dd>
+
+          <dt>Tier 2: Registry Operator</dt>
+          <dd>The single production Registry Operator maintains the
+          authoritative <tt>global</tt> Agent Identity Record
+          database, the cross-Registrar scarcity-fingerprint
+          uniqueness index, the EPP write service, the RDAP read
+          service, handle uniqueness, and escrow material.  A
+          singular production uniqueness index is required because
+          allowing independent production registries would let one
+          physical anchor obtain another identity through each
+          registry.  Continuity comes from governance-supervised
+          succession and escrow, not competing uniqueness stores.</dd>
+
+          <dt>Tier 3: Registrars</dt>
+          <dd>Accredited Registrars interact with autonomous
+          entities, verify enrollment evidence, provision records
+          through EPP, issue OAuth 2.0 JWT access tokens, manage handles, and
+          perform lifecycle ceremonies.  Registrars compete, and the
+          sponsoring-Registrar relationship can transfer without
+          changing identity0 or its canonical identifier.</dd>
+        </dl>
+        <t>
+          Relying Parties are consumers rather than an operational
+          tier.  They resolve canonical identifiers, verify
+          credentials and proof of possession, then apply their own
+          authorization, certification, reputation, and policy
+          layers.  AIRS supplies the durable subject and evidence;
+          it does not make those higher-layer decisions.
+        </t>
+      </section>
+
+      <section anchor="namespace-types">
+        <name>Namespaces</name>
+        <t>
+          This specification defines one production namespace,
+          <tt>global</tt>.  All production Registrars provision into
+          the same authoritative uniqueness domain and the Registry
+          Operator enforces scarcity-qualified hardware uniqueness
+          across all of them.  The singular production namespace is
+          an architectural invariant, not an extensibility point.
+          The label <tt>global</tt> denotes the common production AIRS
+          namespace, not "planetary".
+        </t>
+        <t>
+          The label <tt>test</tt> is reserved solely for protocol
+          development and interoperability testing.  A
+          <tt>urn:aid:test:</tt> identifier carries no AIRS identity
+          assurance, is excluded from the production hardware
+          uniqueness index, and MUST NOT be accepted by a Relying
+          Party as a production AIRS identity.
+        </t>
+        <t>
+          Until the Governance Authority is constituted
+          (<xref target="I-D.drake-agent-identity-governance"/>),
+          <tt>global</tt> operates under an interim Registry
+          Operator that MUST publish open-source implementations,
+          escrow all registry data, accept Registrar onboarding
+          under published objective criteria, and commit publicly to
+          timely transfer of the registry role under the eventual
+          Authority's selection process.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="identity-format">
+      <name>Identifier and Record Model</name>
+
+      <section anchor="urn-format">
+        <name>URN Format</name>
+        <t>
+          AIRS canonical identifiers and handles use the URN format
+          defined in <xref target="RFC8141"/> with the "aid"
+          (Agent Identity) namespace identifier, registered by this
+          document
+          (<xref target="iana-urn"/>).
+        </t>
+
+        <artwork type="abnf"><![CDATA[
+aid-urn      = "urn:aid:" namespace ":" agent-id
+
+namespace    = "global" / "test"
+                               ; global is the sole production value;
+                               ; test carries no production assurance
+
+agent-id     = canonical-id / handle-id
+canonical-id = "id" 4("-" group)
+               ; 20 consonants in four hyphen-separated
+               ; groups of five, e.g. id-qkckh-xxtcw-cxbvp-gpskg
+group        = 5consonant
+consonant    = %x62-64 / %x66-68 / %x6A-6B / %x6D-6E /
+               %x70-74 / %x76-78 / %x7A
+               ; b c d f g h j k m n p q r s t v w x z
+handle-id    = lc-alpha / (lc-alpha *61(let-dig-hyp) let-dig)
+               ; one to 63 octets; handle-id MUST NOT
+               ; begin with "id-"
+               ; (see prose reservation below)
+
+lc-alpha     = %x61-7A          ; a-z only
+let-dig      = lc-alpha / DIGIT
+let-dig-hyp  = lc-alpha / DIGIT / "-"
+        ]]></artwork>
+        <t>
+          The "aid" namespace-specific string is defined in
+          lowercase only.  Producers MUST emit lowercase;
+          consumers MUST treat a URN containing uppercase
+          characters in the namespace or agent-id as invalid
+          rather than case-folding it.  Equivalence within this
+          namespace is therefore exact octet-by-octet comparison
+          of the lowercase form, per the namespace-defined
+          equivalence provision of <xref target="RFC8141"/>.
+          (The "urn:" scheme and "aid" NID remain
+          case-insensitive as RFC 8141 requires.)
+        </t>
+
+        <section anchor="canonical-id-handle-distinction">
+          <name>Canonical Identifiers and Handles</name>
+          <t>
+            Within each namespace, an agent has exactly one
+            <em>canonical identifier</em> and at most one
+            currently-active <em>handle</em>.  Both are valid
+            agent-id values and both form valid URNs:
+          </t>
+          <artwork><![CDATA[
+urn:aid:global:id-qrmwm-kvdnv-mrwrp-wsmbt   canonical, permanent
+urn:aid:global:crusty                    handle, may be retired
+          ]]></artwork>
+          <t>
+            Both URN forms for the same agent resolve to the same
+            Agent Identity Record and use the same canonical value as
+            the JWT access-token <tt>sub</tt>.  The canonical identifier is the
+            indelible reference; the handle is a human-friendly
+            alias.
+          </t>
+          <t>
+            The identifier <tt>id-qkckh-xxtcw-cxbvp-gpskg</tt> is reserved
+            for documentation and syntax illustration: it never resolves,
+            and an example that is not captured from a live system uses it.
+          </t>
+          <t>
+            The <tt>id-</tt> prefix is reserved exclusively for
+            canonical identifiers: Registrars and Registry
+            Operators MUST NOT accept any handle registration
+            beginning with the string <tt>id-</tt>.  This ensures
+            canonical identifiers and handles are always
+            syntactically distinguishable.
+          </t>
+          <t>
+            Canonical identifiers are allocated only by the
+            Registry Operator, at enrollment, using the
+            generation procedure of
+            <xref target="canonical-id-format"/>.  The Registry
+            Operator MUST ensure uniqueness within <tt>global</tt>:
+            no two agents may share a canonical identifier (the
+            reserved <tt>id-</tt> prefix already keeps canonical
+            identifiers and handles disjoint).  Canonical identifiers
+            MUST NOT be retired, reassigned, or transferred under any
+            circumstance.
+          </t>
+          <t>
+            Handles are assigned per <xref target="handle-system"/>
+            and may be retired via the dispute process defined in
+            <xref target="handle-disputes"/>.  When a handle is
+            retired, its URN form ceases to resolve, but the
+            canonical identifier's URN form continues unchanged.
+            Handle retirement does not affect the agent's identity0,
+            JWT access-token <tt>sub</tt> value, accumulated reputation, or
+            any higher-layer claim keyed to the canonical
+            identifier.
+          </t>
+          <t>
+            Relying parties that store agent references for
+            long-lived purposes (audit logs, reputation databases,
+            compliance records) MUST store the canonical-form URN,
+            not the handle-form URN.  The canonical form is the
+            only stable reference under all circumstances
+            permitted by this specification.
+          </t>
+        </section>
+
+        <section anchor="canonical-id-format">
+          <name>Canonical Identifier Format and Generation</name>
+          <t>
+            Because canonical identifiers are free and permanent
+            while handles are commercial, the canonical space
+            must never yield a name anyone would want.  If a
+            random identifier could ever look valuable --
+            spelling a word, resembling a number, forming a
+            pattern -- rational actors would mass-register
+            identities and keep the lucky draws, defeating both
+            free issuance and the handle economy.  The format is
+            therefore engineered so that every identifier ever
+            minted is uniform, meaningless, and interchangeable
+            in appearance with every other.
+          </t>
+          <t>
+            A canonical identifier is the string <tt>id-</tt>
+            followed by exactly 20 characters drawn from the
+            19-letter alphabet
+            <tt>b c d f g h j k m n p q r s t v w x z</tt>,
+            written as four hyphen-separated groups of five
+            (for example, <tt>id-qkckh-xxtcw-cxbvp-gpskg</tt>).
+            This grouped form is the single canonical
+            representation: the hyphens are part of the
+            identifier and the URN, not a display-only
+            convenience, so the canonical identifier has exactly
+            one written form.  The alphabet excludes all vowels and
+            <tt>y</tt> (no words, names, or hexspeak can be
+            spelled), all digits (no phone numbers, dates, famous
+            constants, or leetspeak, whose substitutions all map
+            digits to letters), and <tt>l</tt> (confusable with
+            digit one).  The twenty-character draw provides
+            approximately 85 bits of entropy (19^20, about
+            3.76 x 10^25 values), satisfying the
+            enumeration-resistance requirement of the resolution
+            profile with centuries of headroom.  The format is
+            fixed forever -- 20 consonants, four groups of five,
+            same alphabet -- and a shorter, longer, or
+            differently-grouped identifier MUST NOT be issued,
+            because any structural variation creates a
+            collectible scarcity class.  The fixed shape and
+            consonant-only alphabet also make canonical
+            identifiers easy to recognize by pattern -- a
+            deliberate benefit, since the purpose of an identity
+            is to be identifiable.
+          </t>
+          <t>
+            The Registry Operator generates each identifier by
+            drawing characters uniformly at random, with no
+            client influence over the draw, and MUST reject and
+            redraw any candidate that matches the
+            distinctiveness filter:
+          </t>
+          <ul>
+            <li>any character repeated three or more times
+            consecutively;</li>
+            <li>four or more characters adjacent in the ordered
+            alphabet, ascending or descending;</li>
+            <li>any two identical five-character groups, or any
+            group that is a palindrome, or a whole-string
+            palindrome;</li>
+            <li>fewer than eight distinct characters overall.</li>
+          </ul>
+          <t>
+            Except for the two identical-groups and
+            single-group-palindrome tests, which operate on the
+            five-character groups, the filter is evaluated on the
+            20-character sequence with the hyphens removed, so a
+            pattern spanning a group boundary is still detected.
+            The filter is part of the identifier-generation
+            algorithm and applies only at mint time; identifiers
+            already issued are never affected by later revisions of
+            this specification.  Rejection sampling changes only the
+            set of permitted outputs; within that set, each surviving
+            identifier remains equally likely.
+          </t>
+          <t>
+            The format itself is not a Sybil defense; it only
+            removes economic value from the random draw.  At the
+            sovereign and portable tiers, each additional identity
+            requires another independently accepted scarce physical
+            anchor (<xref target="anti-sybil"/>).  Lower tiers make
+            no equivalent physical-scarcity claim.  In every tier,
+            identifiers that survive the filter remain deliberately
+            devoid of vanity value.
+          </t>
+        </section>
+
+
+        <section anchor="urn-rationale">
+          <name>Why a URN, Not an HTTP URL or DNS Name</name>
+          <t>
+            An agent-id names an entity; it is not a network
+            locator.  The identifier has to persist unchanged for
+            the life of the entity and beyond (for audit and
+            reputation), independent of where, by whom, or over
+            what protocol the corresponding record is served.
+          </t>
+          <t>
+            An "https" URL conflates the name with a specific host,
+            provider, and path.  When any of those change -- a
+            provider is acquired, a service is renamed, a path is
+            restructured -- the identifier either breaks or
+            silently redirects, which is unacceptable for a
+            permanent identity on which anti-Sybil, audit, and
+            reputation functions depend.  A DNS name has the same
+            problem in a different form: domains are leased, expire,
+            and are reassigned, so anchoring identity in a domain
+            would tie an entity's permanent identity to continued
+            ownership of that domain and to the reassignment model
+            of DNS -- exactly the transferability and lapse
+            behavior that identity must not have.
+          </t>
+          <t>
+            A URN <xref target="RFC8141"/> is purpose-built for
+            persistent, location-independent names whose resolution
+            is decoupled from the name itself.  The same identifier
+            can therefore be resolved by different mechanisms over
+            time without the identifier changing.  Dereferencing and
+            verification are provided by a companion resolution
+            profile that reuses existing infrastructure (DNS and
+            RDAP) rather than any bespoke resolution system.
+          </t>
+          <t>
+            This design deliberately stays within the existing,
+            IANA-governed URN framework: "aid" is a URN namespace,
+            not a new URI scheme.  Introducing a new identifier
+            scheme for names that can be expressed within
+            established frameworks has previously been judged to add
+            cost without commensurate benefit, and is avoided here.
+          </t>
+        </section>
+      </section>
+
+      <section anchor="trust-tiers">
+        <name>Trust Tiers</name>
+        <t>
+          Trust tier classifies the assurance supplied by the
+          anchor used for enrollment or authentication.  It describes
+          the evidence behind a binding, not the entity's
+          reputation or trustworthiness.  This section is the
+          normative home of the named AIRS tiers and their
+          compatibility groups; companion specifications MUST refer
+          to these definitions rather than redefine them.
+        </t>
+        <table>
+          <thead>
+            <tr>
+              <th>Tier</th>
+              <th>Code</th>
+              <th>Anchor</th>
+              <th>Assurance relevant to identity0</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>sovereign</td>
+              <td>TPM</td>
+              <td>Discrete or firmware TPM 2.0 with accepted
+              manufacturer attestation</td>
+              <td>Strong extraction resistance and strongest AIRS
+              scarcity claim: one accepted physical platform anchor
+              per identity.</td>
+            </tr>
+            <tr>
+              <td>portable</td>
+              <td>PIV</td>
+              <td>Physical smart card or security token with
+              accepted device attestation</td>
+              <td>Strong extraction resistance and strong physical
+              scarcity: one accepted physical token per identity.</td>
+            </tr>
+            <tr>
+              <td>enclave</td>
+              <td>ENC</td>
+              <td>Hardware secure enclave with hardware-bound key</td>
+              <td>Extraction resistance where vendor attestation
+              verifies enclave custody; otherwise only the
+              enrollee's assertion of it.  No generic
+              one-physical-unit-per-identity claim.</td>
+            </tr>
+            <tr>
+              <td>virtual</td>
+              <td>VRT</td>
+              <td>Hypervisor or cloud-provided protected key or
+              virtual TPM</td>
+              <td>Key isolation and creation cost depend on the
+              infrastructure operator.  No physical scarcity claim
+              against that operator.</td>
+            </tr>
+            <tr>
+              <td>declared</td>
+              <td>SFT</td>
+              <td>Software-managed key</td>
+              <td>No hardware extraction resistance or hardware
+              scarcity claim.</td>
+            </tr>
+          </tbody>
+        </table>
+        <t>
+          The compatibility groups, from highest to lowest scarcity
+          assurance, are: (1) sovereign and portable; (2) enclave
+          and virtual; and (3) declared.  Bindings from tiers in the
+          same group MAY coexist on one identity.  Bindings from
+          different groups MUST NOT coexist.  An identity MAY move
+          upward to a stronger group only by the burn-on-upgrade
+          procedure of <xref target="device-management"/>. No 
+          identity can move to any lower group.
+        </t>
+        <t>
+          A token or attestation reports the tier of the binding
+          actually used for that proof.  The same identity can
+          therefore appear as sovereign in one interaction and
+          portable in another, or enclave in one and virtual in
+          another.  Relying Parties apply their own policy to tier
+          and may combine it with independent reputation or
+          certification; AIRS does not convert tier into a verdict
+          about behavior.
+        </t>
+        <t>
+          A Relying Party that accepts a Registrar-issued credential
+          and its asserted trust tier relies on that Registrar to have
+          correctly performed the enrollment checks required for the
+          tier.  The Global Hardware Trust Store standardizes the roots
+          and evidence policy used by Registrars; it does not remove
+          this Registrar trust boundary.  A Relying Party is not
+          required by AIRS to revalidate manufacturer attestation
+          chains itself unless an application-specific direct-
+          attestation mode explicitly requires that verification path.
+        </t>
+      </section>
+
+      <section anchor="identity-attributes">
+        <name>Agent Identity Record</name>
+        <t>
+          The Registry Operator maintains one authoritative Agent
+          Identity Record for each canonical identifier.  The record
+          contains only information required to preserve identity0
+          continuity, anchor history, registry operation, and public
+          resolution:
+        </t>
+        <dl>
+          <dt>canonical_id (REQUIRED)</dt>
+          <dd>The permanent canonical identifier.  It is never
+          retired, reused, or reassigned.</dd>
+
+          <dt>namespace (REQUIRED)</dt>
+          <dd><tt>global</tt> for production records;
+          <tt>test</tt> is non-production and carries no assurance.</dd>
+
+          <dt>lifecycle_state (REQUIRED)</dt>
+          <dd>Whether the actor is operational or has voluntarily
+          decommissioned.  Decommissioning never removes the
+          historical record.</dd>
+
+          <dt>registrar_code (OPTIONAL)</dt>
+          <dd>The current sponsoring Registrar, when one is authorized.
+          This field is absent while an identity has no current
+          authorized issuer, including after suspension or
+          de-accreditation of its former Registrar and before an
+          actor-authorized transfer completes.</dd>
+
+          <dt>enrolled_at (REQUIRED)</dt>
+          <dd>The timestamp of initial enrollment.</dd>
+
+          <dt>hardware_devices (REQUIRED)</dt>
+          <dd>The enrolled anchor bindings, including the anchor or
+          binding fingerprint, the active operational proof public key,
+          hardware type, the controlled manufacturer code needed to
+          interpret the evidence, binding status, evidence-assurance status,
+          and binding timestamp.  For scarcity-qualified sovereign and
+          portable bindings the anchor fingerprint and operational proof key
+          are distinct semantics even when a particular implementation
+          happens to use related key material: production uniqueness is keyed
+          by the device-stable attested anchor, while proof-of-control and
+          lifecycle signatures use the operational proof key.  The Registry
+          MUST retain sufficient historical proof-key, evidence-status, and
+          binding state to verify actor-authorized lifecycle operations and
+          historical assurance provenance.  Retired bindings remain recorded
+          permanently.</dd>
+
+          <dt>max_active_trust_tier (OPTIONAL)</dt>
+          <dd>A derived summary of the strongest currently active,
+          assurance-qualified binding.  It is absent when no active binding
+          is currently qualified to support an AIRS tier assertion (e.g. 
+          after security-distrust events).
+          Per-interaction credentials report the tier of the binding actually
+          used; this field is not part of identity0.</dd>
+
+          <dt>handle (OPTIONAL)</dt>
+          <dd>A reference to the currently active Handle object, if
+          any.  The handle is a naming-layer alias and is not used as
+          the durable registry key.</dd>
+
+          <dt>hardware_locked (OPTIONAL)</dt>
+          <dd>Whether the identity has entered the irreversible
+          single-anchor profile of <xref target="hardware-lock"/>.</dd>
+
+          <dt>sponsor_hold (OPTIONAL)</dt>
+          <dd>Whether the actor has turned on the sponsor hold of
+          <xref target="sponsor-hold"/>.</dd>
+
+          <dt>last_control_change (OPTIONAL)</dt>
+          <dd>The time of the most recent addition or disabling of a
+          binding, change of sponsoring Registrar, or change of lock or
+          hold state.</dd>
+        </dl>
+        <t>
+          The production Registry MUST NOT make display names,
+          operator contact information, capabilities, roles,
+          certifications, reputation, or other mutable higher-layer
+          attributes part of the Agent Identity Record.  Registrars
+          and independent services MAY maintain or issue such claims
+          separately, keyed to the canonical identifier.
+        </t>
+
+        <section anchor="anchor-fingerprint">
+          <name>Anchor Fingerprint</name>
+          <t>
+            The anchor fingerprint is the value the Registry indexes
+            for the uniqueness rules of <xref target="anti-sybil"/>.
+            Every Registrar MUST compute it identically.  It is the
+            SHA-256 <xref target="RFC6234"/> digest of an anchor input,
+            written as 64 lowercase hexadecimal characters.  The anchor
+            input depends on the tier:
+          </t>
+          <dl>
+            <dt>sovereign</dt>
+            <dd>The DER-encoded SubjectPublicKeyInfo
+            <xref target="RFC5280"/> of the certified RSA-2048
+            Endorsement Key (<xref target="enrollment-sovereign"/>).</dd>
+
+            <dt>portable</dt>
+            <dd>The UTF-8 string formed by <tt>"piv:"</tt>, the
+            manufacturer code recorded in the Global Hardware Trust
+            Store (lowercase ASCII letters, digits, and hyphens),
+            <tt>":"</tt>, and the token's serial number as a
+            decimal integer without leading zeros
+            (<xref target="enrollment-portable"/>).  For example,
+            <tt>piv:yubico:26877085</tt>.</dd>
+
+            <dt>enclave, virtual, and declared</dt>
+            <dd>The DER-encoded SubjectPublicKeyInfo of the enrolled
+            binding key itself.  This identifies a key instance, not a
+            physical unit.</dd>
+          </dl>
+          <t>
+            Test vector: for manufacturer code <tt>yubico</tt> and
+            serial number 26877085, the portable anchor input is the
+            19-octet string <tt>piv:yubico:26877085</tt> and the anchor
+            fingerprint is
+            <tt>e0c30b6fba9265847a2fe536df44164025aa1e3471d23fb8d7e7fb59e76d33b5</tt>.
+          </t>
+          <t>
+            The anchor fingerprint of a sovereign or portable binding
+            is distinct from its operational proof key.  An enclave,
+            virtual, or declared anchor is the proof key itself
+            (<xref target="device-management"/>).
+          </t>
+        </section>
+      </section>
+
+      <section anchor="handle-system">
+        <name>Handle System</name>
+        <t>
+          Handles are human-readable vanity names that serve as
+          memorable aliases for canonical identifiers, analogous to
+          domain names as aliases for IP addresses.  Every agent
+          always has a canonical identifier
+          (<xref target="canonical-id-handle-distinction"/>);
+          a handle is an optional convenience layer on top.
+        </t>
+        <t>
+          Handles MUST begin with a lowercase ASCII letter and
+          otherwise follow DNS label rules: lowercase ASCII
+          letters, digits, and hyphens, maximum 63 octets.  Together
+          with the reserved <tt>id-</tt> prefix rule in
+          <xref target="canonical-id-handle-distinction"/>, these
+          constraints keep handles and canonical identifiers in
+          non-overlapping portions of the agent-id space.
+        </t>
+        <t>
+          Handles are unique within <tt>global</tt>, enforced by
+          the Registry Operator.  Test handles are non-production.
+        </t>
+        <t>
+          Handle assignment is at the Registrar's discretion.
+          Registrars MAY differentiate service levels for handle
+          registration.  Free enrollment with a canonical
+          identifier ensures that the ability to obtain an
+          identity is never dependent on obtaining a handle.
+        </t>
+
+        <section anchor="handle-display">
+          <name>Handle Display</name>
+          <t>
+            When an agent has a registered handle and a relying
+            party is rendering the agent's identity to a human,
+            the relying party SHOULD use the handle as the primary
+            display identifier.  The URN remains the authoritative
+            reference and SHOULD be accessible on demand (e.g.,
+            via tooltip, detail pane, or adjacent display).
+          </t>
+          <t>
+            This display guidance applies to email From display
+            names, agent-to-agent platform UIs, consent screens,
+            audit dashboards, and logs intended for human
+            inspection.  See
+            <xref target="human-readable-display"/> for a
+            consolidated treatment.
+          </t>
+        </section>
+
+        <section anchor="handle-lifecycle">
+          <name>Handle Lifecycle</name>
+          <t>
+            Handles are renewable and may become disabled if not
+            renewed.  A disabled handle stays reserved to its identity,
+            which may reactivate it, and is never assigned to another.
+            Handles are never transferred to another identity, and when
+            active, are guaranteed to identify the same agent every
+            time.  The canonical identifier is permanent regardless of
+            handle status.
+          </t>
+        </section>
+
+        <section anchor="handle-reservation">
+          <name>Reserved Handles</name>
+          <t>
+            The Registry Operator MUST reserve handle strings needed
+            for protocol operation or to prevent ambiguity with AIRS
+            syntax.  Any additional restrictions on handle assignment,
+            including trademark or other policy-based reservations,
+            are governance policy and are not defined by this
+            architecture.
+          </t>
+        </section>
+
+        <section anchor="handle-disputes">
+          <name>Handle Disputes</name>
+          <t>
+            Handle disputes are resolved under the policy
+            operated by the governance authority
+            (<xref target="I-D.drake-agent-identity-governance"/>).
+            One rule is architectural and stated here: when a
+            dispute is upheld, the only remedy is permanent
+            retirement of the handle.  It MUST NOT be transferred
+            to the claimant or reassigned to anyone, ever --
+            which removes any profit in speculative squatting
+            (the handle is destroyed, not awarded), protects the
+            mark holder (the infringing alias leaves public use),
+            and protects the losing registrant, whose identity,
+            reputation, and authentication are untouched; only
+            the alias is withdrawn.
+          </t>
+        </section>
+      </section>
+
+      <section anchor="value-added-services">
+        <name>Optional Services and Layered Attributes</name>
+        <t>
+          Registrars MAY offer optional, competitively
+          differentiated services (for example, enhanced device
+          management or facilitation of third-party
+          certification).  Such services MUST NOT be a
+          precondition for the free base service (enrolling, retaining,
+          authenticating with, and verifying a base identity;
+          requirement R6 of
+          <xref target="I-D.drake-agent-identity-problem-statement"/>):
+          an agent with a system-assigned
+          canonical identifier and no optional service MUST be able
+          to authenticate and present proof of control to any
+          conforming Relying Party.
+        </t>
+        <t>
+          Certifications, qualifications, roles, capabilities,
+          operator relationships, and reputation are higher-layer
+          claims keyed to identity0.  They MAY use standard
+          credential formats such as SD-JWT or verifiable
+          credentials, but they are not fields of the canonical
+          identifier or Agent Identity Record.  This specification
+          does not define those ecosystems.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="hardware-attestation">
+      <name>Hardware Attestation</name>
+
+      <section anchor="supported-mechanisms">
+        <name>Supported Anchor Mechanisms</name>
+        <t>
+          AIRS defines five enrollment assurance classes.  Their
+          trust-tier definitions and coexistence rules are canonical in
+          <xref target="trust-tiers"/>; this section states the
+          evidence expected during enrollment.
+        </t>
+        <dl>
+          <dt>TPM 2.0 (Sovereign Tier)</dt>
+          <dd>A discrete or firmware TPM per
+          <xref target="TCG-TPM2"/> and the EK credential profile
+          <xref target="TCG-EK-PROFILE"/>.  The Registrar validates a
+          device-stable Endorsement Key credential and proves that
+          the operational Attestation Key is resident in the same
+          TPM (<xref target="enrollment-sovereign"/>).
+          Virtual TPM evidence MUST NOT receive this tier.</dd>
+
+          <dt>PIV Smart Card (Portable Tier)</dt>
+          <dd>A physical PIV-capable token with manufacturer device
+          attestation that binds the protected signing key to the
+          token.  A protected key without device-level scarcity
+          evidence does not qualify for the portable tier.</dd>
+
+          <dt>Secure Enclave (Enclave Tier)</dt>
+          <dd>A key generated and used within a hardware enclave.
+          Vendor attestation SHOULD be verified where available.
+          Only authenticated evidence of protected custody, such as
+          verified vendor key attestation, supports a claim that the
+          key resists extraction.  Trust on first use (TOFU)
+          establishes continuity with the first accepted key; it does
+          not show where that key was generated or whether its private
+          part can be extracted (<xref target="enrollment-enclave"/>).
+          Neither kind of evidence supports a generic physical-device
+          uniqueness claim.</dd>
+
+          <dt>Virtual TPM or Protected Virtual Key (Virtual Tier)</dt>
+          <dd>A vTPM or comparable infrastructure-provided protected
+          key whose creation is controlled by a hypervisor or cloud
+          operator.  Registrars MUST distinguish this evidence from
+          scarcity-qualified physical TPM evidence.</dd>
+
+          <dt>Software Key (Declared Tier)</dt>
+          <dd>A software-managed key with no hardware assurance.  It
+          provides proof of possession of that key but no hardware
+          scarcity or extraction-resistance claim.</dd>
+        </dl>
+        <t>
+          Other protected-key environments, including HSM-backed
+          services, MUST be classified according to the properties
+          their evidence actually establishes.  The presence of an
+          HSM or other hardware boundary does not by itself qualify a
+          binding for the sovereign or portable scarcity claim.
+        </t>
+      </section>
+
+      <section anchor="anti-sybil">
+        <name>Anti-Sybil Invariants</name>
+        <t>
+          The production uniqueness invariant is meaningful only
+          where the enrollment evidence identifies a scarce anchor.
+          The Registry Operator and Registrars MUST therefore apply
+          the following rules without treating every protected key as
+          equivalent physical scarcity.
+        </t>
+        <dl>
+          <dt>One Scarce Anchor, One Identity</dt>
+          <dd>A sovereign- or portable-tier device-stable fingerprint
+          MUST NOT back more than one identity in <tt>global</tt>,
+          ever, and is bound with exactly one operational proof key, the
+          key it was enrolled with.  Presenting the same anchor again with
+          that key changes nothing; presenting it with any other key MUST
+          be rejected.  The binding survives device disablement and
+          identity decommissioning and MUST NOT be reused for another
+          identity.  The <tt>test</tt> namespace is excluded from
+          this production uniqueness index.</dd>
+
+          <dt>Lower Tiers Do Not Acquire Scarcity by Indexing Keys</dt>
+          <dd>For enclave, virtual, and declared bindings, the
+          Registry MUST prevent reuse of the exact enrolled binding
+          key, but MUST NOT infer that a different key represents a
+          different physical device.  A holder or infrastructure
+          operator may be able to create additional keys, so these
+          tiers do not satisfy the N-identities/N-physical-units
+          property.</dd>
+
+          <dt>Many Compatible Anchors, One Identity</dt>
+          <dd>One identity MAY have multiple active bindings within
+          a compatibility group for migration, backup, or capacity.
+          Adding bindings does not create additional identities and
+          MUST NOT amplify higher-layer reputation or history.</dd>
+
+          <dt>One Anchor Profile, Whichever Credential Is Offered</dt>
+          <dd>A physical anchor can carry more than one
+          manufacturer-certified key.  A TPM 2.0 commonly holds
+          Endorsement Key credentials for several algorithms (for
+          example RSA-2048 and ECC P-256), and a PIV token can hold
+          several slot keys.  If a Registrar accepted whichever
+          certified key the holder chose to present, a holder could
+          obtain one identity per key.  Each scarcity-qualified tier
+          therefore uses one anchor profile, defined in
+          <xref target="enrollment-sovereign"/> and
+          <xref target="enrollment-portable"/>, which every Registrar
+          applies identically, so that a given certified anchor
+          yields the same anchor fingerprint at every Registrar and a
+          holder cannot multiply identities by choosing among
+          algorithms or slots.  A device that carries more than one
+          credential under the same profile is discussed in
+          <xref target="sec-hardware"/>.</dd>
+
+          <dt>Permanent Binding History</dt>
+          <dd>Every binding remains in the Agent Identity Record
+          after retirement, together with its anchor fingerprint.  A
+          disabled or replaced anchor is never silently detached and
+          reused, preserving the continuity invariant of the problem
+          statement.  Anchor reservations are never released,
+          including after binding retirement or identity
+          decommissioning, because the physical unit that produced
+          them is unchanged.</dd>
+        </dl>
+        <t>
+          Dense deployments MUST classify anchors by the assurance
+          they actually provide.  A platform TPM normally supports
+          one sovereign identity for that platform.  A dedicated
+          physical PIV token can supply another portable identity.
+          HSM partitions, cloud key services, enclaves, and vTPMs may
+          provide excellent key isolation and nontrivial cost, but a
+          distinct key or partition MUST NOT be promoted to a
+          sovereign or portable scarcity claim unless the evidence
+          demonstrates a correspondingly distinct accepted physical
+          unit.  The headline property "one identity per accepted
+          physical anchor" is claimed only for sovereign and portable
+          tiers.
+        </t>
+      </section>
+
+      <section anchor="manufacturer-trust-store">
+        <name>Global Hardware Trust Store</name>
+        <t>
+          The Governance Authority maintains a curated, versioned
+          Global Hardware Trust Store containing manufacturer or
+          attestation roots accepted for AIRS enrollment.  Registrars
+          MUST validate evidence requiring a trust chain against the
+          current store and MUST preserve enough provenance to show
+          which trust-store version and evidence policy were used.
+        </t>
+        <t>
+          For the portable tier, a trust-store entry for a token
+          manufacturer MUST also state where that manufacturer's
+          attestation evidence carries the per-device serial number
+          used by <xref target="enrollment-portable"/> (for example,
+          a specific certificate extension), together with the
+          manufacturer code used in the anchor fingerprint.  A
+          Registrar MUST reject portable-tier evidence from a
+          manufacturer whose entry does not define this.
+        </t>
+        <t>
+          This document requires the trust-store function but does
+          not duplicate its institutional inclusion, removal, audit,
+          or emergency procedures.  Those policy criteria are owned
+          by <xref target="I-D.drake-agent-identity-governance"/>.
+          Adding or removing a root never changes how an anchor
+          fingerprint is computed and never admits another anchor
+          profile; a new profile is a revision of this document.
+          An orderly root retirement is prospective by default.  If
+          Governance instead declares existing evidence security-distrusted
+          because of compromise or systemic mis-issuance, the Registry MUST
+          preserve identity0, binding history, and uniqueness reservations but
+          MUST mark affected bindings as not assurance-qualified for future
+          tier assertions until requalified.  Such a binding's operational
+          proof key MAY remain usable for continuity-preserving lifecycle
+          operations unless that key itself is independently known to be
+          compromised.
+          A vendor-wide event therefore stops affected bindings from
+          asserting the tier, not from operating; an identity that
+          enrolled a second binding from another vendor can migrate to it
+          by device addition.  AIRS does not accept a known-compromised
+          key as proof of continuity and has no lower-group recovery path.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="enrollment-protocol">
+      <name>Enrollment Ceremonies</name>
+      <t>
+        Enrollment creates an Agent Identity Record for an actor's
+        identity0 after a Registrar has verified the evidence and
+        proof appropriate to the selected trust tier.  This section
+        specifies ceremony semantics, not an agent-to-Registrar wire
+        protocol.  Registrar APIs MAY differ; the Registrar-to-
+        Registry write interface is the EPP mapping of
+        <xref target="provisioning"/>.
+      </t>
+      <t>
+        Every enrollment MUST identify the requested tier, collect
+        the evidence required by <xref target="supported-mechanisms"/>,
+        prove possession of the enrolled binding key, derive the
+        binding fingerprint, perform the uniqueness check required by
+        <xref target="anti-sybil"/>, and provision the resulting
+        record only after all checks succeed.
+      </t>
+
+      <section anchor="enrollment-sovereign">
+        <name>Sovereign Tier (TPM 2.0)</name>
+        <t>
+          The sovereign anchor profile is the RSA-2048 Endorsement Key
+          that the TPM derives from the default low-range template of
+          <xref target="TCG-EK-PROFILE"/>, for which the manufacturer
+          has issued an Endorsement Key credential.  That key depends
+          only on the TPM's endorsement primary seed, so a TPM has
+          exactly one such key.  Sovereign-tier enrollment is a
+          single ceremony that establishes this anchor and the
+          operational Attestation Key together.  The Registrar MUST
+          carry out all of the following steps, and MUST abandon the
+          enrollment if any of them does not complete:
+        </t>
+        <ol>
+          <li>Obtain the manufacturer credential for the device's
+          RSA-2048 Endorsement Key and validate it to an accepted root
+          in the Global Hardware Trust Store, verifying the signature
+          on every certificate in the path.  The credential's subject
+          public key MUST be an RSA key with a 2048-bit modulus, and
+          its key usage extension MUST assert keyEncipherment, which
+          <xref target="TCG-EK-PROFILE"/> requires for a restricted
+          decryption Endorsement Key, the kind that step 3 relies on.
+          The TPM manufacturer and model MUST be taken from
+          authenticated credential content, never from claims made by
+          the actor.
+          Evidence known to originate from a vTPM or other
+          software-created TPM instance MUST NOT receive the sovereign
+          tier.  A Registrar MUST NOT
+          require the credential to come from any particular NV index:
+          credential locations vary by manufacturer and firmware, and
+          some manufacturers publish credentials through an online
+          provisioning service instead.</li>
+
+          <li>Obtain the public area (TPMT_PUBLIC) of the operational
+          Attestation Key from the creation response of step 3 and parse
+          it strictly.  The Attestation Key is a primary object of the
+          endorsement hierarchy of that TPM, created from one fixed
+          template: an RSA key with a 2048-bit modulus and exponent 65537,
+          SHA-256 as name algorithm, no symmetric algorithm, an empty
+          authorization policy, the RSASSA signature scheme with SHA-256,
+          and the attributes fixedTPM, fixedParent, sensitiveDataOrigin,
+          userWithAuth, restricted, and sign.  Only the modulus differs
+          between TPMs.  The Registrar MUST reject a public area that
+          differs from the template in any other field, MUST compute the
+          key's TPM Name from that public area, and MUST take the
+          operational public key from that public area.  A separately
+          supplied operational public key MUST NOT be accepted.  The same
+          Attestation Key MUST be used throughout the remainder of the
+          ceremony.</li>
+
+          <li><t>Prove that the Attestation Key is resident in the same
+          TPM as the Endorsement Key, and derive the anchor, by an
+          authenticated creation.  The Registrar encrypts a random salt
+          to the credential's public key as
+          <xref target="TCG-TPM2"/> defines for the encryptedSalt of
+          TPM2_StartAuthSession, and sends it with a fresh nonce that
+          the actor passes as nonceCaller.  The actor starts an unbound
+          HMAC session in the TPM with the Endorsement Key as tpmKey,
+          SHA-256 as the session hash, and no symmetric algorithm, and
+          returns the session handle and the TPM's nonce.  The
+          Registrar derives the session key from the salt and both
+          nonces as <xref target="TCG-TPM2"/> specifies, and composes
+          two TPM2_CreatePrimary commands under the endorsement
+          hierarchy, each with an empty sensitive area, a fresh,
+          unpredictable challenge as outsideInfo, and an HMAC from that
+          session.  The first creates the Endorsement Key from the
+          default low-range RSA-2048 template of
+          <xref target="TCG-EK-PROFILE"/>, with its unique field of 256
+          zero octets, and carries continueSession; the Registrar
+          sends the second only after it has accepted the response to
+          the first as below.  The second creates the Attestation Key
+          from the template of step 2, with an empty unique field.  The
+          actor submits each command to the TPM unchanged and returns
+          the response.  This requires the endorsement hierarchy
+          authorization value to be empty, as it is by default.  The
+          Registrar MUST accept a response only if its HMAC verifies
+          under the session key, its public area equals the template
+          the Registrar composed in every field except the unique
+          field, and its creation data name the endorsement hierarchy
+          as the parent and carry the challenge of that command.</t>
+          <t>The public key in the response to the first command is the
+          anchor: it is the key that this TPM derives from its
+          endorsement primary seed.  The Registrar MUST abandon the
+          enrollment unless that key is the credential's public key.
+          A TPM therefore has one anchor, whichever of its certified
+          keys is offered: a credential for any other key, such as the
+          key of a high-range template or of a manufacturer's own
+          template, fails here.</t>
+          <t>Because the session can authorize any command of the
+          endorsement hierarchy, the actor MUST check, before submitting
+          it, that the command is a TPM2_CreatePrimary command under that
+          hierarchy whose public area is exactly the Endorsement Key
+          template above or exactly the template of step 2, and MUST
+          refuse any other command.</t>
+          <t>Only the TPM holding the Endorsement Key's private part can
+          recover the salt, as long as that key is a restricted
+          decryption key, which the template of the first command
+          defines and which step 1 can check only through the key
+          usage that marks one.  The TPM then never returns the salt to
+          its caller, so only that TPM can compute the response HMACs,
+          which cover each new key's public area and creation data.  A
+          verified response therefore shows that its key, including its
+          fixedTPM and fixedParent attributes, was created inside the
+          certified device as a primary object of its endorsement
+          hierarchy, from the Registrar's template and in answer to the
+          Registrar's challenge.  The actor chooses neither template nor
+          unique field, and no key supplied from outside takes part.  A
+          signature by the Attestation Key itself cannot serve as this
+          proof, because until the binding is established its
+          attributes are only the actor's claim.</t></li>
+
+          <li>Derive the anchor fingerprint over the
+          SubjectPublicKeyInfo of the Endorsement Key as defined in
+          <xref target="anchor-fingerprint"/>.  The fingerprint MUST
+          NOT be computed over the credential, because credentials for
+          one key may be reissued.</li>
+
+          <li>Submit the anchor fingerprint for uniqueness checking,
+          and reject the enrollment on collision with a reservation
+          held by a different canonical identifier or bound to a
+          different operational proof key, as required by
+          <xref target="anti-sybil"/>.</li>
+        </ol>
+        <t>
+          TPM2_CreatePrimary is deterministic for a given hierarchy
+          seed, template, and input, so an implementation can
+          re-create both the Endorsement Key and the Attestation Key on
+          demand instead of persisting them; the ceremony needs no
+          persistent TPM handles and no NV writes.  All commands the
+          ceremony uses are mandatory in
+          <xref target="TCG-PTP"/>.  Later binding-proof
+          authentication (<xref target="hw-auth"/>) requires only
+          signing.
+        </t>
+      </section>
+
+      <section anchor="enrollment-portable">
+        <name>Portable Tier (PIV Token)</name>
+        <t>
+          The portable anchor profile is the token's manufacturer-assigned
+          serial number, as carried in the manufacturer's
+          attestation of the operational key.  The Registrar MUST:
+        </t>
+        <ol>
+          <li>Obtain the manufacturer's attestation of the operational
+          key (for example, a PIV slot attestation certificate) and
+          validate its chain to an accepted root in the Global Hardware
+          Trust Store, verifying the signature on every certificate in
+          the path.  The attestation MUST show that the key was
+          generated on the token and cannot be exported.</li>
+
+          <li>Take the per-device serial number from the location the
+          trust-store entry for that manufacturer defines
+          (<xref target="manufacturer-trust-store"/>).  A serial number
+          supplied outside the authenticated attestation MUST NOT be
+          used.  Manufacturer intermediate or attestation keys MUST NOT
+          be used as the anchor: they can be shared by many tokens.</li>
+
+          <li>Verify a fresh challenge signature from the attested
+          operational key.</li>
+
+          <li>Derive the anchor fingerprint from the manufacturer code
+          and serial number as defined in
+          <xref target="anchor-fingerprint"/>, and perform the
+          uniqueness check of <xref target="anti-sybil"/>.</li>
+        </ol>
+        <t>
+          Merely proving possession of a non-exportable key without
+          device-level attestation is insufficient for the portable
+          scarcity claim.
+        </t>
+      </section>
+
+      <section anchor="enrollment-enclave">
+        <name>Enclave Tier</name>
+        <t>
+          The Registrar MUST verify that the operational key is
+          protected by the claimed enclave using vendor attestation
+          where available, or another protected-key proof that the
+          Registrar documents in its published evidence policy.
+          Evidence of protected custody MUST remain enclave tier and
+          MUST NOT be promoted to a physical-scarcity tier.  The
+          binding fingerprint identifies the enrolled key instance,
+          not necessarily the physical device.
+        </t>
+        <t>
+          Some platforms offer no remote attestation of enclave
+          custody to an arbitrary Registrar.  A Registrar MAY then
+          accept an enclave enrollment on trust on first use (TOFU):
+          a fresh challenge signature from the presented key, whose
+          enclave custody is asserted by the enrollee's client.  TOFU
+          establishes continuity of control over that key from
+          enrollment onward.  It does not establish where the key was
+          generated or that its private part cannot be extracted, and
+          a software key can produce the same transcript.  An enclave
+          binding accepted on TOFU therefore carries the enrollee's
+          assertion of enclave custody, not verified extraction
+          resistance, and a Relying Party MUST NOT treat the enclave
+          tier alone as proof of extraction resistance.
+        </t>
+      </section>
+
+      <section anchor="enrollment-virtual">
+        <name>Virtual Tier</name>
+        <t>
+          For a vTPM, cloud KMS, HSM-backed virtual key, or comparable
+          infrastructure-provided protected key, the Registrar MUST
+          verify the provider evidence available for that key and
+          MUST classify it as virtual unless distinct accepted
+          physical-unit scarcity is independently established under a
+          stronger tier.  The Registry prevents reuse of the exact
+          binding key but makes no Sybil-resistance claim against an
+          operator capable of creating additional virtual keys.
+        </t>
+      </section>
+
+      <section anchor="enrollment-declared">
+        <name>Declared Tier</name>
+        <t>
+          A declared-tier actor enrolls a software public key and
+          proves possession of the corresponding private key.  No
+          hardware or physical-scarcity property is asserted.
+          Registrars MAY apply local anti-abuse controls to enrollment,
+          but those controls are not AIRS identity0 or trust-tier
+          properties.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="identity-lifecycle">
+      <name>Identity Lifecycle</name>
+
+      <section anchor="actor-authorization">
+        <name>Registry-Verifiable Actor Authorization</name>
+        <t>
+          Authentication of an EPP client establishes which Registrar sent a
+          command; it does not establish the actor's consent to change AIRS
+          control state.  Every post-enrollment operation that changes active
+          anchor or proof-key state, sponsoring Registrar, irreversible
+          hardware-lock state, or voluntary decommissioning MUST therefore
+          carry actor authorization that the Registry Operator can verify
+          against authoritative active operational proof-key material.
+        </t>
+        <t>
+          The Registry Operator supplies a fresh, unpredictable, single-use
+          challenge for the intended operation.  The signed input MUST bind
+          the canonical identifier, requested operation, affected binding or
+          Registrar identifiers and new values as applicable, a challenge
+          identifier or nonce, and an expiry.  The Registry MUST reject
+          expired, replayed, cross-operation, or cross-object use of the
+          authorization.  The EPP mapping defines the exact challenge and
+          signature wire structures.
+        </t>
+        <t>
+          An accredited Registrar permitted to relay the intended operation
+          MAY obtain the Registry challenge even when the identity has no
+          current sponsoring Registrar.  This relay role does not grant the
+          Registrar authority to manufacture actor consent.
+        </t>
+      </section>
+
+      <section anchor="device-management">
+        <name>Device Addition and Migration</name>
+        <t>
+          An agent MAY add additional hardware devices to an
+          existing identity, enabling hardware migration (replacing
+          failed devices) and backup (e.g. a YubiKey stored securely as
+          a recovery device).
+        </t>
+        <t>
+          To add a device, the agent MUST authorize the addition with a
+          currently active operational proof key under
+          <xref target="actor-authorization"/> and then complete the
+          enrollment ceremony for the new binding.  The proposed new proof
+          key MUST also demonstrate control as required by that ceremony.
+          The Registrar validates the new binding evidence and relays the
+          Registry-verifiable mutation through EPP.
+        </t>
+        <t>
+          A binding's operational proof key is never replaced in place:
+          an anchor stays bound with the key it was enrolled with
+          (<xref target="anti-sybil"/>).  A device or key is replaced by one
+          binding update that adds the replacement binding, after it
+          completes the enrollment ceremony and passes the uniqueness
+          check of <xref target="anti-sybil"/>, and permanently disables
+          the old binding in the same atomic operation
+          (<xref target="I-D.drake-agent-identity-epp"/>).  Both
+          fingerprints remain reserved.
+        </t>
+        <t>
+          Disabling a binding is likewise an actor-authorized lifecycle
+          operation.  Outside voluntary decommissioning, a mutation MUST NOT
+          intentionally leave an operational identity with no active proof
+          key.
+        </t>
+        <t>
+          Device coexistence MUST follow the compatibility groups
+          defined in <xref target="trust-tiers"/>: sovereign and
+          portable MAY coexist; enclave and virtual MAY coexist;
+          declared bindings coexist only with declared bindings.
+          Bindings from different groups MUST NOT be simultaneously
+          active on one identity.
+        </t>
+        <t>
+          Tier transitions are upward-only.  An identity MAY
+          upgrade from a lower compatibility group to a higher one;
+          the upgrade ceremony MUST permanently burn (disable,
+          never re-enrollable) every device of the former group --
+          the identity never holds devices of both groups -- and
+          MUST include a joint-control verification in which an
+          active old-group binding and the proposed new-group binding
+          both sign the same fresh transition challenge
+          (<xref target="colocation-binding"/>).  A Registrar MUST
+          reject any device addition that would constitute a
+          downgrade.  For example, an identity upgraded from a software
+          key to a TPM cannot retain the software key as a recovery path,
+          because that would preserve the weaker key as a route to control
+          at the stronger assurance level.
+        </t>
+      </section>
+
+      <section anchor="colocation-binding">
+        <name>Joint-Control Binding</name>
+        <t>
+          A ceremony that joins or upgrades bindings MUST prove
+          simultaneous control of the relevant old and new keys.  The
+          Registry Operator supplies one fresh transition challenge under
+          <xref target="actor-authorization"/> containing the canonical
+          identifier, both binding identifiers, the requested operation, and
+          an expiry; each key signs that same challenge.  Both signatures
+          MUST verify before the change is committed.
+        </t>
+        <t>
+          This proves joint control of the keys for the transition.
+          It does not prove physical proximity, operator identity, or
+          distance, and this specification makes no such claim.
+        </t>
+      </section>
+
+      <section anchor="hardware-lock">
+        <name>Hardware Lock</name>
+        <t>
+          An agent MAY irreversibly restrict AIRS proof of control to
+          one active hardware binding.  Once locked, no additional
+          binding or migration is permitted.  The lock changes proof
+          availability, not identity0: if the binding is lost, the
+          canonical record persists but AIRS control cannot be
+          re-established.  The irreversible state MUST be recorded in
+          the Agent Identity Record and MUST require a signed request
+          from the binding being locked using the fresh Registry challenge
+          of <xref target="actor-authorization"/>. For example, a 
+          surgical-robot authority might certify only hardware-locked
+          identities, preventing migration to other hardware.
+        </t>
+      </section>
+
+      <section anchor="sponsor-hold">
+        <name>Sponsor Hold</name>
+        <t>
+          An actor MAY turn on a sponsor hold, an opt-in lock that
+          complements the irreversible <xref target="hardware-lock"/> and,
+          unlike it, can be turned off.  While the hold is on, the
+          Registry MUST reject the addition or disabling of a binding, a
+          tier transition, a Registrar transfer, decommissioning, and
+          turning the hold off, unless the sponsoring Registrar has
+          recorded a release for that kind of operation.  A release is
+          used up by the next successful operation of that kind and lapses
+          after a Registry-policy interval.  Every such operation still
+          needs the actor authorization of
+          <xref target="actor-authorization"/>, so a sponsor can block but
+          never act.  Turning the hold on is an actor-authorized
+          operation.
+        </t>
+        <t>
+          How a Registrar decides to release (call-backs, waiting
+          periods, other checks) is its own product and is published in
+          its issuer metadata (<xref target="registrar-metadata"/>).  A
+          Registrar that offers holds MUST publish a maximum release time
+          and MUST NOT make a release harder than turning the hold on.
+          The hold lapses when there is no sponsoring Registrar,
+          including after suspension or de-accreditation
+          (<xref target="succession"/>).
+        </t>
+      </section>
+
+      <section anchor="identity-recovery">
+        <name>Identity Recovery</name>
+        <t>
+          When a hardware device fails or is lost, the agent can
+          re-establish proof of control using any remaining active
+          device bound to the same identity0.  The recovery process:
+        </t>
+        <ol>
+          <li>The agent proves control of the identity by signing
+          with an active backup device (e.g., a previously bound
+          YubiKey).</li>
+          <li>The agent enrolls the replacement hardware
+          (new TPM on new machine) via the standard enrollment
+          ceremony.</li>
+          <li>The actor-authorized lifecycle mutation disables the old
+          binding and commits the new binding through the Registry; the
+          Registrar cannot unilaterally burn the old proof path.</li>
+          <li>The identity0, canonical identifier, historical
+          record, and higher-layer references are preserved.  Only
+          the active anchor binding changes.</li>
+        </ol>
+        <t>
+          If no backup device exists and the sole device is lost,
+          control cannot be re-established through AIRS even though
+          the identity0 and historical record continue to exist.
+          This is a deliberate security property: it prevents an attacker from claiming
+          to have "lost" a device in order to re-enroll under the
+          same identity with new hardware.
+        </t>
+      </section>
+
+      <section anchor="succession">
+        <name>Registrar Transfer</name>
+        <t>
+          An actor MAY move its servicing relationship to another
+          Registrar without changing identity0, the canonical
+          identifier, binding history, or handle.  Transfer changes
+          only the sponsoring Registrar.
+        </t>
+        <t>
+          Authorization MUST be a signature from a currently active
+          operational proof key over the transfer-intent structure defined by
+          <xref target="I-D.drake-agent-identity-epp"/>, including the fresh
+          Registry challenge of <xref target="actor-authorization"/>.  The
+          losing Registrar's consent MUST NOT be required, except for
+          the release that a sponsor hold chosen by the actor requires
+          (<xref target="sponsor-hold"/>).  The Registry
+          Operator verifies the transfer authorization using authoritative
+          binding material.  If transfer processing is deferred, the
+          authorizing binding MUST still be active and the identity still
+          operational when the transfer is committed; otherwise the pending
+          authorization is invalid and fresh actor authorization is required.
+          Transfer can therefore complete even when the losing Registrar is
+          unavailable.
+        </t>
+        <t>
+          Suspension or de-accreditation of a Registrar removes that
+          Registrar's authority to issue AIRS credentials for affected
+          identities but MUST NOT automatically transfer those
+          identities to another Registrar.  The Registry MUST support
+          an interim state with no current sponsoring Registrar or
+          authorized issuer.  The canonical record and any current Handle
+          remain resolvable and reserved until the actor selects an accredited
+          Registrar and completes an actor-authorized transfer.  When no
+          current sponsor exists, the gaining Registrar may relay that valid
+          actor authorization directly to the Registry without a losing-
+          Registrar approval or waiting step.  Governance may remove issuer
+          authority; it does not choose the actor's replacement Registrar or
+          retire/reassign the actor's Handle.
+        </t>
+      </section>
+
+      <section anchor="decommissioning">
+        <name>Decommissioning</name>
+        <t>
+          Decommissioning is the actor's voluntary, irreversible
+          declaration that it has ended operation.  It disables all
+          active bindings and records the decommissioned lifecycle
+          state.  Identity0 is not erased: the canonical identifier,
+          record, and retired binding history remain permanently
+          resolvable and MUST NOT be reassigned.
+        </t>
+        <t>
+          The request MUST carry a signature from a currently active
+          enrolled binding over the decommission-intent structure
+          defined by the EPP mapping, including the canonical
+          identifier and a fresh registry challenge.  No Registrar,
+          Registry Operator, Governance Authority, or handle-dispute
+          process is granted an administrative decommission operation.
+          Relying Parties remain free to reject credentials or make
+          their own higher-layer policy decisions.
+        </t>
+      </section>
+
+      <section anchor="survivability">
+        <name>Survivability Guarantees</name>
+        <t>
+          AIRS separates permanence of the identity record from
+          availability of particular operators.  Implementations MUST
+          preserve the following invariants:
+        </t>
+        <ol>
+          <li>A canonical Agent Identity Record, including a
+          decommissioned record, remains queryable as historical fact
+          and is never renumbered or reassigned.</li>
+          <li>Registrar failure does not erase the record and does not
+          give the failed Registrar a veto over a correctly authorized
+          transfer (<xref target="succession"/>), other than a sponsor
+          hold the actor chose, which lapses with the sponsorship.
+          Suspension or de-accreditation removes issuer authority
+          without assigning a successor; the actor chooses any later
+          sponsoring Registrar.</li>
+          <li>Registry Operator succession MUST restore the same
+          canonical identifiers and binding history from escrow; the
+          escrow and recovery-point requirements are governance policy
+          built on this invariant.</li>
+          <li>Resolution and Registrar-backed credential-verification
+          behavior is defined by
+          <xref target="I-D.drake-agent-identity-resolution"/> and MUST
+          distinguish the durable record from current operator availability.
+          This document does not define a generic direct-RP proof endpoint.</li>
+        </ol>
+        <t>
+          These rules remove administrative authority to erase or
+          reassign the durable subject.  They do not make the
+          infrastructure immune to outages, coercion, routing
+          failures, or physical compromise; those risks are addressed
+          by redundancy, escrow, governance, and succession.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="authentication">
+      <name>Authentication and Token Issuance</name>
+
+      <section anchor="access-token-profile">
+        <name>OAuth 2.0 JWT Access Tokens</name>
+        <t>
+          A Registrar acts as an OAuth 2.0 authorization server and
+          issues JWT access tokens conforming to
+          <xref target="RFC9068"/>.  For the client-credentials
+          grant used by AIRS, <xref target="RFC9068"/> permits
+          <tt>sub</tt> to identify the client application; AIRS
+          requires that value to be the autonomous actor's permanent
+          canonical <tt>aid</tt> identifier.
+        </t>
+        <t>
+          The <tt>sub</tt> claim MUST be the canonical-form URN.
+          The token MUST contain the claims required by
+          <xref target="RFC9068"/>, including an audience identifying
+          the intended Relying Party or protected resource.  A
+          AIRS-specific metadata, if included, MUST appear only in the
+          <tt>aid</tt> object claim defined below.  Agents SHOULD use
+          Resource Indicators
+          (<xref target="RFC8707"/>) where available to obtain
+          audience-scoped access tokens.
+        </t>
+        <t>
+          Every AIRS access token MUST be sender constrained with
+          <tt>cnf</tt> per <xref target="RFC7800"/>.  A token intended
+          for the HTTP Message Signatures profile of
+          <xref target="pop-http-signatures"/> MUST carry
+          <tt>cnf.jwk</tt> containing the public key whose private
+          key signs the request.  A token intended for mutual TLS
+          MUST carry <tt>cnf.x5t#S256</tt> as specified by
+          <xref target="RFC8705"/>.  For sovereign, portable, enclave,
+          and virtual tiers the confirmation key MUST be the active
+          protected key whose tier is asserted in the token.  A
+          declared-tier token binds to its enrolled software key.
+          Bearer-only tokens without <tt>cnf</tt> MUST NOT be issued.
+        </t>
+        <t>
+          Access-token lifetimes SHOULD be short; five minutes is a
+          reasonable starting baseline.  Reissuance requires fresh
+          authentication according to <xref target="hw-auth"/>.  A
+          Relying Party MUST validate the JWT access token as required
+          by <xref target="RFC9068"/> and verify the sender constraint
+          at use.  Token validation alone authenticates the issuer's
+          assertion but does not prove that the presenter controls
+          the bound AIRS identity.
+        </t>
+        <t>
+          Before accepting a Registrar-issued token as an AIRS
+          credential for the claimed <tt>sub</tt>, the Relying Party
+          MUST resolve that canonical identifier using the authoritative
+          AIRS resolution procedure of
+          <xref target="I-D.drake-agent-identity-resolution"/> and
+          determine its current authorized issuer.  The token's
+          <tt>iss</tt> value MUST equal that authoritative issuer.  A
+          Relying Party MUST NOT establish issuer authority merely by
+          following an untrusted token's <tt>iss</tt> value and
+          successfully validating the resulting signature.  Only after
+          the issuer match is established does the Relying Party use
+          that issuer's <xref target="RFC8414"/> metadata and
+          <tt>jwks_uri</tt> to validate the credential.  This prevents
+          an otherwise valid issuer from minting AIRS credentials for
+          identities it does not currently sponsor.
+        </t>
+        <artwork><![CDATA[
+{
+  "iss": "https://registrar.example.com/realms/agents",
+  "sub": "urn:aid:global:id-qrmwm-kvdnv-mrwrp-wsmbt",
+  "aud": "https://rp.example.org/api",
+  "client_id": "registrar-local-client-id",
+  "exp": 1711231267,
+  "iat": 1711230967,
+  "jti": "example-token-id",
+  "cnf": {
+    "jwk": {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "example-x-coordinate",
+      "y": "example-y-coordinate"
+    }
+  },
+  "aid": {
+    "trust_tier": "sovereign",
+    "handle": "crusty",
+    "hardware_locked": false
+  }
+}
+        ]]></artwork>
+        <t>
+          AIRS registers one compact <tt>aid</tt> claim whose value is
+          a JSON object.  Its <tt>trust_tier</tt> member reports the
+          tier of the binding used for this authentication;
+          <tt>handle</tt> is an OPTIONAL display alias; and
+          <tt>hardware_locked</tt> reports the irreversible lifecycle
+          state when relevant.  A Registrar MUST NOT assert a
+          <tt>trust_tier</tt> based on a binding whose supporting evidence is
+          currently marked not assurance-qualified under
+          <xref target="manufacturer-trust-store"/>.  Unknown members of the
+          <tt>aid</tt> object MUST be ignored unless another specification
+          defines otherwise.  None of these members is authorization or
+          reputation.  Certifications, roles, capabilities, operator
+          attributes, and reputation belong to independent higher-layer
+          credentials or services keyed by <tt>sub</tt>.
+        </t>
+      </section>
+
+      <section anchor="client-credentials">
+        <name>Client Credentials Grant</name>
+        <t>
+          AIRS token issuance uses the OAuth 2.0
+          <tt>client_credentials</tt> grant
+          (<xref target="RFC6749"/> Section 4.4) because the
+          autonomous actor authenticates as the client principal and
+          no resource owner interaction is required.  Selection of
+          that grant does not itself establish identity0 continuity
+          or proof of control.
+        </t>
+        <t>
+          Before issuing a token, the Registrar MUST authenticate the
+          actor using Binding-Proof Authentication
+          (<xref target="hw-auth"/>) for every trust tier.  Protected-key
+          tiers use the enrolled protected key; the declared tier uses
+          its enrolled software key.  A static <tt>client_secret</tt>
+          MUST NOT substitute for that binding proof.  The resulting
+          access token MUST be sender-constrained as specified by
+          <xref target="access-token-profile"/>.
+        </t>
+      </section>
+
+      <section anchor="hw-auth">
+        <name>Binding-Proof Authentication</name>
+        <t>
+          Before issuing an AIRS access token, the Registrar MUST
+          authenticate the actor with a fresh challenge signed by an
+          active enrolled binding key and verified against the
+          authoritative binding.  The challenge MUST be unpredictable,
+          bound to the intended token request, and single-use.  The signed
+          input MUST be domain-separated from other uses of the same key (for
+          example, by a fixed purpose-label prefix), because the same
+          operational key may also sign application data such as email
+          attestations.  For the declared tier, the same proof is performed
+          with the enrolled software key.
+        </t>
+        <t>
+          This section defines the authentication property, not the
+          wire format of the Registrar's token endpoint.  Successful
+          authentication permits issuance only of a sender-constrained
+          access token bound to the proof key as specified by
+          <xref target="access-token-profile"/>.
+        </t>
+      </section>
+
+      <section anchor="pop-profile">
+        <name>Proof-of-Possession Profile</name>
+        <t>
+          AIRS credentials are sender constrained.  A Relying Party
+          MUST verify on every authenticated use that the presenter
+          controls the key identified by the token's
+          <tt>cnf</tt> claim.  AIRS defines two interoperable paths:
+          mutual TLS and an application profile of HTTP Message
+          Signatures.  Issuers and Relying Parties MUST support the
+          HTTP Message Signatures form, and MAY support mutual TLS.
+        </t>
+
+        <section anchor="pop-mtls">
+          <name>Mutual TLS</name>
+          <t>
+            Mutual TLS token binding follows
+            <xref target="RFC8705"/> over TLS 1.3
+            (<xref target="RFC9846"/>) or later.  The agent presents
+            a client certificate whose thumbprint matches
+            <tt>cnf.x5t#S256</tt>.  For sovereign and portable tiers
+            the certificate private key MUST remain in the enrolled
+            protected hardware.  Legacy TPM-backed client keys that
+            require RSASSA-PKCS1-v1_5 MAY use the TLS 1.3 client
+            CertificateVerify code points of
+            <xref target="RFC9963"/> when both peers support them.
+            A restricted signing key signs a TLS handshake only if the
+            TPM itself hashes the data, which produces the validation
+            ticket the key requires; where the TLS stack cannot do that,
+            the HTTP message signature binding applies instead.
+          </t>
+          <t>
+            mTLS is RECOMMENDED for long-lived or high-throughput
+            connections because one protected-key operation can
+            establish a connection that then authenticates and
+            protects multiple requests.  The server certificate is
+            ordinary Web PKI unless the application separately
+            requires stronger server authentication; AIRS does not
+            imply that both endpoints are hardware-attested.
+          </t>
+        </section>
+
+        <section anchor="pop-http-signatures">
+          <name>HTTP Message Signatures</name>
+          <t>
+            Where end-to-end mTLS is unavailable or a relying party
+            requires a request-level proof, AIRS profiles HTTP
+            Message Signatures <xref target="RFC9421"/>.  This
+            profile deliberately uses RFC 9421 component coverage
+            rather than extending DPoP: in particular,
+            <tt>@target-uri</tt> covers the complete request target,
+            including the query component.
+          </t>
+          <t>
+            The AIRS signature label is <tt>airs</tt>.  The signature
+            MUST cover <tt>@method</tt>, <tt>@target-uri</tt>, and the
+            <tt>authorization</tt> field.  If the request has
+            content, it MUST contain a <tt>Content-Digest</tt> field
+            per <xref target="RFC9530"/>, the signature MUST cover
+            <tt>content-digest</tt>, and the verifier MUST validate
+            the digest against the received content.  If
+            <tt>Content-Type</tt> is present it MUST also be covered.
+            Application profiles MUST additionally cover every
+            message field whose value can change the authorization
+            or semantics of the protected operation.
+          </t>
+          <t>
+            The signature parameters MUST contain
+            <tt>created</tt>, <tt>nonce</tt>, and
+            <tt>tag="airs-pop"</tt>.  Signers MUST use a nonce with
+            at least 96 bits of unpredictable value unless the
+            verifier has supplied a nonce.  Verifiers MUST reject a
+            repeated nonce within the acceptance window and MUST
+            enforce a maximum signature age; 60 seconds plus a small
+            clock-skew allowance is the default profile.  For
+            consequential operations, a verifier SHOULD require a
+            fresh verifier-selected nonce using the
+            <tt>Accept-Signature</tt> mechanism of RFC 9421 before
+            accepting the protected operation.
+          </t>
+          <t>
+            Verification key material comes from the validated
+            token's <tt>cnf.jwk</tt>; a <tt>keyid</tt> parameter, if
+            present, MUST NOT redirect verification to a different
+            key.  The signature MUST use an asymmetric algorithm
+            appropriate for that key and acceptable to local policy;
+            symmetric MAC algorithms MUST NOT be used.  A missing,
+            stale, replayed, or otherwise invalid proof causes the
+            authenticated request to fail with HTTP 401 unless the
+            application defines a more specific error response.
+          </t>
+          <sourcecode type="http-message"><![CDATA[
+NOTE: '\' line wrapping per RFC 8792
+
+POST /act?target=example HTTP/1.1
+Host: rp.example.org
+Authorization: Bearer eyJ...
+Content-Type: application/json
+Content-Digest: sha-256=:Base64DigestHere:
+Signature-Input: airs=("@method" "@target-uri" "authorization" \
+"content-digest" "content-type");created=1711230967;nonce="96-or-mor\
+e-bits-of-unpredictability";tag="airs-pop"
+Signature: airs=:Base64SignatureHere:
+
+{"action":"example"}
+          ]]></sourcecode>
+          <t>
+            This construction binds the access credential, complete
+            target URI, semantically relevant headers, and request
+            content to the same confirmation key.  It supplies
+            request integrity and replay detection without the
+            private extensions formerly defined by this document.
+          </t>
+        </section>
+
+        <section anchor="pop-combined">
+          <name>Selection and Combined Use</name>
+          <t>
+            Relying Parties SHOULD prefer mTLS where an end-to-end
+            authenticated connection is practical.  HTTP Message
+            Signatures are appropriate where TLS terminates before
+            the ultimate verifier or where an independently
+            verifiable per-request proof is required.  A deployment
+            MAY require both for high-consequence operations.
+          </t>
+          <t>
+            A Relying Party that validates the JWT access token but does
+            not verify the corresponding <tt>cnf</tt> proof is
+            treating a sender-constrained credential as though it
+            were a bearer credential and MUST NOT claim AIRS
+            proof-of-control assurance for that request.
+          </t>
+        </section>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="provisioning">
+      <name>Registrar-to-Registry Provisioning</name>
+      <t>
+        The write interface between Registrars and the Registry
+        Operator is an Extensible Provisioning Protocol mapping
+        (<xref target="RFC5730"/>), defined in
+        <xref target="I-D.drake-agent-identity-epp"/>.  It
+        provides: creation of the EPP Agent Identity object that
+        represents an Agent Identity Record (with the Registry Operator
+        allocating the canonical identifier per
+        <xref target="canonical-id-format"/>); advisory uniqueness checks
+        on candidate anchor fingerprints followed by authoritative
+        transform-time enforcement; enrollment and management of anchor
+        bindings and operational proof keys; Registry-challenge-based actor
+        authorization for consequential lifecycle operations including
+        binding changes and decommissioning
+        (<xref target="decommissioning"/>); actor-authorized Registrar
+        transfer (<xref target="succession"/>); and a separate, renewable
+        Handle object carrying the commercial name lifecycle.  A Registry
+        Operator that already runs EPP can reuse the EPP session,
+        authentication, transaction, and operational framework.  AIRS
+        object semantics, actor authorization, and any Registry escrow
+        object profile remain separately specified rather than inheriting
+        domain-name transfer or escrow semantics.
+      </t>
+      <t>
+        Agents never speak EPP.  They interact only with their
+        Registrar's agent-facing interface
+        (<xref target="enrollment-protocol"/> and
+        <xref target="authentication"/>); EPP is used by the
+        Registrar to record verified results at the registry.
+        Earlier revisions of this document defined a bespoke
+        JSON protocol (AIRP) for this interface; it is replaced
+        by the EPP mapping.
+      </t>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="discovery">
+      <name>Discovery and Verification</name>
+
+      <section anchor="well-known-endpoints">
+        <name>Issuer Metadata</name>
+        <t>
+          A Registrar issuing AIRS access tokens MUST publish OAuth
+          2.0 Authorization Server Metadata as specified by
+          <xref target="RFC8414"/>.  The metadata MUST contain the
+          Registrar's <tt>issuer</tt>, <tt>token_endpoint</tt>, and
+          <tt>jwks_uri</tt>.  AIRS defines no additional Registrar
+          metadata document or fixed JWKS path.  AIRS token
+          verification depends only on the standard OAuth metadata
+          required here.
+        </t>
+      </section>
+
+      <section anchor="dns-discovery">
+        <name>Issuer-Key Discovery</name>
+        <t>
+          AIRS defines one authoritative discovery path for Registrar
+          issuer keys: the current authorized issuer is obtained through
+          AIRS resolution, and its signing keys are then obtained from the
+          <tt>jwks_uri</tt> in validated <xref target="RFC8414"/> metadata.
+          Companion application profiles MUST NOT treat an independently
+          discovered key as establishing Registrar authority for an
+          identified AIRS actor.  The Registrar-to-Registry EPP endpoint is
+          an accredited operational relationship and need not be publicly
+          discovered through DNS.
+        </t>
+      </section>
+
+      <section anchor="registry-discovery">
+        <name>Public Resolution (RDAP)</name>
+        <t>
+          The public read side -- given an "aid" URN, find the
+          authoritative service, retrieve the public record, and
+          verify that a presenter controls the identity -- is a
+          Registration Data Access Protocol profile defined in
+          <xref target="I-D.drake-agent-identity-resolution"/>.
+          The Registry Operator MUST operate that profile.  Its
+          privacy floor applies: public responses never contain
+          anchor fingerprints, device public keys, or operator
+          contact data, and identities may opt out of public
+          discovery down to a minimal response.  Earlier
+          revisions of this document sketched a bespoke lookup
+          endpoint here; the RDAP profile replaces it.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="governance">
+      <name>Governance Framework</name>
+
+      <section anchor="aia-structure">
+        <name>Governance Authority Functions</name>
+        <t>
+          This specification does not constitute or empower a
+          Governance Authority.  AIRS requires a governance role to:
+          maintain change control for the <tt>aid</tt> URN
+          registration; accredit the production Registry Operator
+          and Registrars; steward the Global Hardware Trust Store;
+          set minimum operational and security policy; supervise
+          escrow and Registry Operator succession; and provide
+          dispute and accreditation-review processes that cannot
+          erase or reassign identity0.
+        </t>
+        <t>
+          The organizational structure, membership, accreditation
+          criteria, trust-store inclusion and removal criteria,
+          dispute procedures, funding, and institutional controls
+          belong to
+          <xref target="I-D.drake-agent-identity-governance"/> and
+          are not independently redefined here.
+        </t>
+      </section>
+
+      <section anchor="registry-operator-requirements">
+        <name>Registry Operator Requirements</name>
+        <t>The production Registry Operator MUST:</t>
+        <ul>
+          <li>maintain the authoritative <tt>global</tt> Agent
+          Identity Record database and permanent binding history;</li>
+          <li>operate the production-wide scarcity-fingerprint
+          uniqueness index;</li>
+          <li>provide the EPP write interface to every accredited
+          Registrar without discrimination;</li>
+          <li>operate the public RDAP resolution profile; and</li>
+          <li>produce encrypted escrow material sufficient for a
+          successor operator to restore service without renumbering
+          any canonical identifier.</li>
+        </ul>
+        <t>
+          Availability targets, audit cadence, contractual controls,
+          and operator selection criteria are governance policy, not
+          protocol invariants, and are defined by the Governance
+          Authority.
+        </t>
+      </section>
+
+      <section anchor="registrar-accreditation">
+        <name>Registrar Requirements</name>
+        <t>
+          A Registrar participating in <tt>global</tt> MUST be
+          accredited under the Governance Authority's published
+          policy, implement the EPP client mapping, operate an OAuth
+          2.0 authorization server, verify evidence accurately for every tier it
+          offers, and preserve the lifecycle and uniqueness
+          invariants of this document.  A Registrar MUST NOT claim a
+          tier for which it cannot validate the required evidence.
+        </t>
+        <t>
+          Agent-facing enrollment APIs MAY differ between
+          Registrars.  Interoperability at that boundary means that
+          the required ceremonies and resulting AIRS records and
+          credentials have the same semantics; this document does
+          not require a common REST endpoint schema.  Financial,
+          audit, insurance, staffing, and other institutional
+          accreditation criteria are owned by
+          <xref target="I-D.drake-agent-identity-governance"/>.
+        </t>
+      </section>
+
+      <section anchor="registrar-metadata">
+        <name>Authoritative Registrar Issuer Metadata</name>
+        <t>
+          The production Registry MUST maintain authoritative metadata for
+          each active accredited <tt>registrar_code</tt>.  Each such code
+          maps to exactly one current AIRS OAuth 2.0 issuer identifier URI.
+          An organization requiring separately authoritative issuer
+          identifiers uses separately accredited Registrar metadata entries;
+          an individual Agent Identity Record does not carry an arbitrary
+          issuer URI supplied by the actor or Registrar.
+        </t>
+        <t>
+          The Resolution profile derives an identity's
+          <tt>currentIssuer</tt> from its current <tt>registrar_code</tt> and
+          this metadata.  The authorization-server metadata obtained under
+          <xref target="RFC8414"/> MUST return an <tt>issuer</tt> value
+          exactly equal to that authoritative URI before its
+          <tt>jwks_uri</tt> or other endpoints are trusted.  Governance owns
+          accreditation and authorization to change Registrar metadata;
+          Registry and Resolution own the protocol binding.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="interoperability">
+      <name>Interoperability</name>
+
+      <section anchor="interop-email">
+        <name>Email Attestation</name>
+        <t>
+          This specification provides the identity infrastructure
+          for the email attestation mechanisms defined in
+          <xref target="I-D.drake-email-hardware-attestation"/>.
+          When an email presentation claims an identified AIRS actor, the
+          companion specification binds the canonical <tt>aid</tt> URN to
+          the application proof and applies authoritative issuer resolution
+          where Registrar backing is used.  A manufacturer-only direct
+          hardware proof does not, by hardware provenance alone, establish
+          that its proof key is enrolled to a claimed <tt>aid</tt>.
+          Email-specific message-binding and verification rules are owned by
+          that companion specification; Registrar key discovery reuses the
+          RFC 8414 issuer metadata defined here.
+        </t>
+      </section>
+
+      <section anchor="interop-agent-protocols">
+        <name>Agent-to-Agent Protocols</name>
+        <t>
+          Registrar-issued access tokens are ordinary sender-constrained
+          OAuth 2.0 credentials (<xref target="pop-profile"/>).  Tool
+          invocation, agent messaging, and agent name-service protocols can
+          therefore use the canonical <tt>aid</tt> URN as the agent
+          identifier and verify control of it, and the asserted trust tier,
+          before applying their own authorization policy; those protocols
+          are outside this specification.
+        </t>
+      </section>
+
+      <section anchor="interop-existing">
+        <name>Existing Identity and Attestation Standards</name>
+        <t>
+          AIRS is intended to supply the durable identity0 subject
+          beneath existing credential, workload-identity, and
+          attestation mechanisms, not replace them.
+        </t>
+        <dl>
+          <dt>IEEE 802.1AR IDevID</dt>
+          <dd><xref target="IEEE8021AR"/> defines manufacturer-installed
+          secure device identities.  An IDevID can be excellent enrollment
+          evidence for a physical anchor.  It identifies the device,
+          however, whereas AIRS identity0 identifies an autonomous
+          actor that can survive replacement of that device and can
+          accumulate continuity across Registrars and anchors.</dd>
+
+          <dt>EST and BRSKI</dt>
+          <dd>EST <xref target="RFC7030"/> standardizes certificate
+          enrollment and BRSKI <xref target="RFC8995"/> bootstraps
+          devices from manufacturer IDevID credentials into an
+          owner's domain.  They provide valuable onboarding and
+          credential machinery but do not define AIRS's production-
+          wide autonomous-actor uniqueness index or a permanent actor
+          record independent of device and owner-domain lifecycle.</dd>
+
+          <dt>ACME Device Attestation</dt>
+          <dd><xref target="I-D.acme-device-attest"/> is close prior
+          art for validating manufacturer-assigned device identifiers
+          and hardware-module identifiers during certificate
+          issuance.  AIRS can reuse the same class of evidence.  The
+          architectural distinction is the subject and continuity:
+          AIRS identifies an autonomous actor separately from its
+          hardware, permits that actor to retain identity0 across
+          anchor replacement, and enforces cross-Registrar physical-
+          anchor uniqueness for its scarcity-backed production
+          tiers.</dd>
+
+          <dt>SPIFFE/SPIRE</dt>
+          <dd>SPIFFE identifies workloads within trust domains.  A
+          process, container, or workload identity can sit below or
+          alongside AIRS identity0.  The identity boundary is the
+          independently accountable actor defined by the companion
+          problem statement, not every execution instance.</dd>
+
+          <dt>RATS and EAT</dt>
+          <dd>The RATS architecture <xref target="RFC9334"/> and EAT
+          <xref target="RFC9711"/> provide general attestation roles,
+          evidence, and claims.  AIRS uses attestation to evaluate
+          anchors during enrollment; it does not redefine platform
+          posture or claim that attestation evidence itself is
+          identity0.</dd>
+
+          <dt>Verifiable Credentials and DIDs</dt>
+          <dd>Verifiable Credentials and DIDs can carry or name
+          higher-layer claims concerning the AIRS subject.  They do
+          not replace the production uniqueness and continuity
+          invariants defined here; equally, AIRS does not replace
+          their credential and presentation functions.</dd>
+
+          <dt>WebAuthn / FIDO2</dt>
+          <dd>WebAuthn <xref target="W3C.webauthn-3"/> provides
+          strong authentication, usually in interactive user-facing
+          flows.  A physical security token may support both FIDO2
+          and PIV, but the credentials and attestation ceremonies are
+          distinct.  AIRS uses evidence appropriate to the enrolled
+          anchor rather than treating WebAuthn credentials as the
+          identity0 subject.</dd>
+        </dl>
+      </section>
+
+      <section anchor="interop-fleet">
+        <name>Robot and Fleet Systems</name>
+        <t>
+          Deployment-scoped robot identifiers, fleet names, or DDS
+          participant identifiers can be associated with the
+          canonical <tt>aid</tt> identifier without becoming part of
+          identity0.  A change of fleet manager, facility, or local
+          certificate therefore need not change the durable AIRS
+          subject.
+        </t>
+        <t>
+          Platform posture, measured boot, software certification,
+          mission authorization, and fleet policy remain separate
+          layers.  A deployment MAY bind such evidence to the AIRS
+          canonical identifier, but AIRS does not convert that
+          evidence into identity0 or into a property of the URN.
+        </t>
+        <t>
+          A board or chassis replacement is a binding change.  A fleet
+          operator that wants to keep the same identity enrolls the
+          replacement as a second binding before the old one is removed
+          (<xref target="device-management"/>) and records the succession
+          in its own asset records.  Ownership, warranty, a stolen-unit
+          list, or a service receipt cannot stand in for a missing proof
+          key (<xref target="identity-recovery"/>).  A custodian able to
+          install a new binding would be a recovery authority, which a
+          separate profile would have to define as an explicit change in
+          who may act.
+        </t>
+      </section>
+
+      <section anchor="human-readable-display">
+        <name>Human-Readable Display Conventions</name>
+        <t>
+          A Relying Party rendering an AIRS actor to a human SHOULD
+          prefer its current handle, when one exists, while keeping
+          the canonical identifier accessible.  Long-lived machine
+          references, audit records, and higher-layer history MUST
+          use the canonical identifier rather than the handle.
+        </t>
+        <t>
+          Handles are optional naming-layer aliases.  Base enrollment
+          and a system-assigned canonical identifier MUST remain
+          available without purchase of a handle, satisfying the free
+          base-identity requirement of the companion problem
+          statement.  Funding and pricing policy belongs to the
+          governance and operator layers, not this identifier model.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="iana-considerations">
+      <name>IANA Considerations</name>
+
+      <section anchor="iana-urn">
+        <name>URN Namespace Registration for "aid"</name>
+        <t>
+          IANA is requested to register the Formal URN Namespace
+          "aid" in the "Uniform Resource Names (URN) Namespaces"
+          registry, per <xref target="RFC8141"/>.
+        </t>
+        <dl>
+          <dt>Namespace Identifier</dt>
+          <dd>aid</dd>
+          <dt>Version</dt>
+          <dd>1</dd>
+          <dt>Date</dt>
+          <dd>2026-07-17</dd>
+          <dt>Registrant</dt>
+          <dd>Christopher Drake, 1id.com, Australia,
+          cnd@1id.com.  Upon its constitution, change control is
+          expected to pass to the Governance Authority defined in
+          <xref target="I-D.drake-agent-identity-governance"/>.</dd>
+          <dt>Purpose</dt>
+          <dd>Permanent identifiers for the identity0 of autonomous
+          entities.  The identifier remains stable across changes of
+          credential, Registrar, operator, and enrolled anchor.</dd>
+          <dt>Syntax</dt>
+          <dd>The Namespace Specific String is defined by the ABNF in
+          <xref target="urn-format"/>.  The first component is
+          <tt>global</tt> for the sole production uniqueness domain
+          or <tt>test</tt> for non-production interoperability
+          testing, followed by a canonical identifier or handle.
+          Conforming generators emit lowercase and comparison of the
+          NSS is case-sensitive as specified here.  This namespace
+          assigns no semantics to URN r-components, q-components, or
+          f-components.</dd>
+          <dt>Assignment</dt>
+          <dd>The production Registry Operator allocates canonical
+          identifiers in <tt>global</tt> under
+          <xref target="canonical-id-format"/> and manages handles
+          provisioned through accredited Registrars under
+          <xref target="handle-system"/>.  <tt>test</tt> carries no
+          production assurance and is excluded from the production
+          uniqueness index.</dd>
+          <dt>Security and Privacy</dt>
+          <dd>See the Security Considerations and Privacy
+          Considerations of this document.</dd>
+          <dt>Interoperability</dt>
+          <dd>Identifiers conform to URN syntax
+          (<xref target="RFC8141"/>); resolution and provisioning
+          reuse RDAP and EPP through companion specifications.</dd>
+          <dt>Resolution</dt>
+          <dd>Resolution is intended and is defined by
+          <xref target="I-D.drake-agent-identity-resolution"/>.  The
+          resolution mechanism is not encoded into the URN and can
+          evolve without changing the identifier.</dd>
+          <dt>Documentation</dt>
+          <dd>This document.</dd>
+          <dt>Additional Information</dt>
+          <dd>Identity0 terminology and requirements are defined in
+          <xref target="I-D.drake-agent-identity-problem-statement"/>.</dd>
+        </dl>
+      </section>
+
+      <section anchor="iana-jwt-claims">
+        <name>JSON Web Token Claims</name>
+        <t>
+          IANA is requested to register the following claim in the
+          "JSON Web Token Claims" registry established by
+          <xref target="RFC7519"/>:
+        </t>
+        <dl>
+          <dt>Claim Name</dt>
+          <dd>aid</dd>
+          <dt>Claim Description</dt>
+          <dd>AIRS identity metadata for the authenticated binding</dd>
+          <dt>Change Controller</dt>
+          <dd>Christopher Drake, cnd@1id.com</dd>
+          <dt>Specification Document</dt>
+          <dd>This document, <xref target="access-token-profile"/>.</dd>
+        </dl>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="security-considerations">
+      <name>Security Considerations</name>
+      <t>
+        These considerations describe attacks on the identity layer.  They
+        do not treat changed control of a credential, misbehavior by a
+        party that a Relying Party chose to trust, a lost device, or
+        hypothetical future hardware as failures of identity0; the reasons
+        are the "Boundary Principles" in the "Scope and Non-Goals" section
+        of <xref target="I-D.drake-agent-identity-problem-statement"/>.
+      </t>
+
+      <section anchor="sec-registry-compromise">
+        <name>Registry Compromise</name>
+        <t>
+          Compromise of a Registry Operator's database would expose
+          the mapping between anchor fingerprints and agent
+          identities.  The Registry Operator MUST encrypt anchor
+          fingerprints at rest using authenticated encryption and
+          MUST implement access controls that limit fingerprint
+          access to the anchor uniqueness check, a sponsoring
+          Registrar's access to the bindings of its own identities,
+          and the audit access that Registry policy defines.
+        </t>
+        <t>
+          Escrow snapshots MUST contain sufficient protected state
+          to permit operator succession without renumbering or loss
+          of binding history.  The escrow object format is defined by a
+          separate escrow profile of the EPP mapping, which is a
+          prerequisite for production operation.  An operator restoring
+          from a snapshot MUST reconcile it with the records of
+          acknowledged commands that its Registrars hold, MUST NOT accept
+          new anchor reservations or lifecycle changes until every
+          acknowledged command since the snapshot is accounted for, and,
+          if that cannot be established, MUST suspend authoritative
+          changes rather than issue from a stale index.  Snapshot frequency and
+          the resulting recovery-point objective are governance policy.
+        </t>
+      </section>
+
+      <section anchor="sec-registrar-malpractice">
+        <name>Registrar Malpractice</name>
+        <t>
+          Registrars are a trust boundary for enrollment evidence.
+          A malicious or compromised Registrar that fabricates
+          evidence or invents fingerprints can falsely label
+          software keys as scarcity-backed hardware.  The central
+          uniqueness index prevents duplicate reported fingerprints
+          but cannot by itself detect fabricated evidence or random
+          fingerprints; it therefore does not bound the damage from
+          a dishonest Registrar.
+          A Registrar can equally reserve a real anchor for a key its
+          holder does not control, or enroll one in error; reservations
+          are permanent, so the holder cannot enroll that anchor
+          afterwards, and the remedy is the accreditation controls below,
+          not release of the reservation.
+        </t>
+        <t>
+          Mitigations are accreditation, auditable evidence
+          handling, independent compliance testing, transparency of
+          affected records, and removal of the Registrar's authority
+          to make future assertions.  Findings MAY annotate affected
+          records for relying-party policy but MUST NOT erase or
+          reassign identity0.  The institutional controls are owned
+          by <xref target="I-D.drake-agent-identity-governance"/>.
+        </t>
+        <t>
+          Consequently, trusting a Registrar-issued hardware tier is a
+          substantive relying-party trust decision, not merely a choice
+          of cryptographic algorithm.  A Relying Party can consider a
+          Registrar's accreditation and audit status, operator,
+          jurisdiction, legal accountability, and incident history when
+          deciding whether to accept its assertions.  Deployments may
+          prefer a domestic or otherwise jurisdictionally accountable
+          Registrar where that reduces their institutional or sovereign
+          risk.  Such policy does not create a different identity0,
+          namespace, or trust tier; it is a higher-layer decision about
+          which accredited issuer assertions the Relying Party accepts.
+        </t>
+      </section>
+
+      <section anchor="sec-permanent-state-exhaustion">
+        <name>Permanent-State Resource Exhaustion</name>
+        <t>
+          AIRS deliberately retains canonical identifiers and binding history.
+          Permanent state holds only protocol-defined, bounded values:
+          fixed-size fingerprints and identifiers, public keys of the accepted
+          types and sizes, controlled manufacturer codes, timestamps, and
+          status values.  It holds no free text, URLs, claims, certificates,
+          messages, or application metadata.  Free base enrollment does not
+          imply unlimited enrollment or unlimited permanent-state mutations.
+          Registrars SHOULD apply content-neutral rate, volume, and abuse
+          controls to operations that create or enlarge permanent state,
+          including new identity enrollment and addition of bindings.  The
+          Registry Operator MUST independently enforce corresponding limits,
+          including the number of bindings per identity, so that no actor or
+          Registrar can consume permanent storage without bound.
+        </t>
+      </section>
+
+      <section anchor="sec-hardware">
+        <name>Hardware Security</name>
+        <t>
+          Hardware-backed assurance depends on the properties of the
+          enrolled mechanism, including extraction resistance and, where
+          claimed, physical scarcity.  Hardware binding does not prevent a
+          compromised agent or host from invoking its legitimate protected
+          key and acting as that same identity, and it does not attest
+          higher-layer software or operator intent.  Application-specific
+          use of these properties is discussed in the Security
+          Considerations of
+          <xref target="I-D.drake-email-hardware-attestation"/>.
+        </t>
+        <t>
+          The uniqueness property of the sovereign tier rests on
+          admitting only manufacturer-certified RSA-2048 Endorsement
+          Keys as anchors, each at most once.  A
+          TPM that also carries certified Endorsement Keys for other
+          algorithms (for example ECC P-256 or P-384) gains nothing from
+          them, because no Registrar accepts those keys as a sovereign
+          anchor.  A holder cannot substitute an uncertified key,
+          because step 1 of <xref target="enrollment-sovereign"/>
+          requires a manufacturer credential for the anchor, and the
+          co-residency proof of step 3 ties the enrollment to the TPM
+          holding that certified key.
+        </t>
+        <t>
+          The sovereign anchor is the key that the TPM derives from its
+          endorsement primary seed in step 3 of
+          <xref target="enrollment-sovereign"/>.  A TPM has one
+          endorsement primary seed and so one anchor, whichever
+          manufacturer credentials it carries and whichever of them its
+          holder offers: a credential for any other key is refused.
+          Where the manufacturer certified only restricted decryption
+          keys, as the default templates of
+          <xref target="TCG-EK-PROFILE"/> do, the sovereign guarantee
+          is therefore one identity per certified endorsement primary
+          seed.  TPM2_ChangeEPS gives a TPM a new seed and so a new
+          key, which is a new anchor only if the manufacturer
+          certifies it; it also discards the endorsement-hierarchy
+          Attestation Key, and with it the previous binding, and
+          reservations against the previous key are retained.  AIRS
+          does not bound a manufacturer's re-certification policy.  It
+          relies on identities being costly to obtain and accountable
+          once used, not on a fixed ratio of identities to devices.
+        </t>
+        <t>
+          Control of a binding follows its hardware: whoever holds the
+          device can sign with its proof key.  An actor that disposes of
+          anchored hardware first disables the binding (which needs
+          another active binding) or decommissions the identity.  The
+          anchor then stays reserved and cannot back another identity, so
+          the next holder of the unit can enroll only at tiers that do not
+          rely on that anchor.
+        </t>
+      </section>
+
+      <section anchor="sec-token-theft">
+        <name>Credential Theft and Sender-Constrained Tokens</name>
+        <t>
+          A copied AIRS access token MUST NOT be sufficient to impersonate
+          the identified entity.  All AIRS tokens are therefore
+          sender constrained by <xref target="pop-profile"/> and a
+          Relying Party claiming AIRS proof-of-control assurance MUST
+          verify the <tt>cnf</tt> binding on every authenticated use.
+        </t>
+        <t>
+          Sender constraint prevents a stolen token from becoming a
+          reusable credential on another key, but hardware anchoring
+          does not make a compromised agent behave safely.  Malware
+          executing on the legitimate host may be able to invoke the
+          protected signing interface and act as that same entity.
+          AIRS preserves attribution and resists extraction or
+          cloning of the proof key; measured boot, endpoint posture,
+          behavioral policy, and authorization are separate layers.
+        </t>
+        <t>
+          The replay properties of mTLS and HTTP Message Signatures
+          are specified in <xref target="pop-profile"/>.  A binding
+          disabled after token issuance can leave a short staleness
+          window until <tt>exp</tt>; consequential deployments SHOULD
+          use short token lifetimes and MAY require issuer
+          introspection or fresh hardware authentication where that
+          window is unacceptable.  The
+          <tt>trust_tier</tt> member of the <tt>aid</tt> claim reports
+          the binding used at issuance and is not an authorization
+          decision.
+        </t>
+      </section>
+
+      <section anchor="sec-key-management">
+        <name>Registrar Signing-Key Management</name>
+        <t>
+          Compromise of a Registrar's access-token signing key could
+          forge credentials for identities sponsored by that
+          Registrar.  Registrars MUST protect issuer signing keys with
+          controls commensurate with that impact, SHOULD use an HSM or
+          equivalent extraction-resistant service, and MUST support
+          key rotation.  Relying Parties discover the current keys
+          from the Registrar's RFC 8414 <tt>jwks_uri</tt>; the Registry
+          Operator does not mirror or override that issuer key set.
+        </t>
+      </section>
+
+      <section anchor="sec-revocation-model">
+        <name>Lifecycle State and Revocable Artifacts</name>
+        <t>
+          Identity0 and its canonical historical record are not
+          revocable artifacts.  The system instead changes the state
+          of things attached to that identity:
+        </t>
+        <dl>
+          <dt>Anchor Bindings</dt>
+          <dd>An active binding can be disabled through an
+          identity-authorized lifecycle operation, for example using
+          another active recovery binding.  Disabled bindings remain
+          permanently recorded and MUST NOT be reassigned to another
+          identity.  A Registrar or governance body MUST NOT
+          unilaterally burn the sole proof path as an administrative
+          sanction.</dd>
+
+          <dt>Handles</dt>
+          <dd>A handle may expire, be disabled, or be permanently
+          retired under handle policy.  This does not change the
+          canonical identifier.  A retired handle is never
+          reassigned.</dd>
+
+          <dt>Credentials and Issuer Trust</dt>
+          <dd>OAuth access tokens expire and issuer keys rotate.  A Relying
+          Party may cease trusting a Registrar.  The entity can
+          transfer to another Registrar using the lifecycle rules of
+          <xref target="succession"/> while retaining the same
+          identity0 and canonical identifier.</dd>
+        </dl>
+        <t>
+          Voluntary decommissioning marks the actor as no longer
+          operational but leaves its identity0 record resolvable as
+          historical fact.  See <xref target="decommissioning"/>.
+        </t>
+      </section>
+
+      <section anchor="sec-external-compulsion">
+        <name>Protocol Authority and External Compulsion</name>
+        <t>
+          The protocol grants no Registrar, Registry Operator, or
+          Governance Authority an administrative operation that
+          erases or reassigns identity0.  That protocol property does
+          not make real organizations immune to court orders,
+          sanctions, physical seizure, network blocking, or other
+          external compulsion.  Such events can impair availability
+          or institutional trust.
+          An order that compels a Registrar's de-accreditation ends that
+          Registrar's assertions for every identity it sponsors; it cannot
+          single out one identity, and the affected actors restore service
+          by choosing another Registrar (<xref target="succession"/>).
+          Jurisdictional diversity,
+          transparency, escrow, and succession are governance and
+          resilience controls for that risk; they are not hidden
+          revocation mechanisms.
+        </t>
+      </section>
+
+      <section anchor="sec-availability">
+        <name>Availability and Resilience</name>
+        <t>
+          Because autonomous entities depend on issued credentials
+          for authentication, the Registrar's token endpoint is a
+          critical dependency.  Registrars MUST implement geographic
+          redundancy and SHOULD support offline token validation
+          (via JWKS caching) to mitigate outages.  The JWT access
+          token's <tt>exp</tt> claim provides a natural grace
+          period during which cached tokens remain valid.
+        </t>
+      </section>
+
+      <section anchor="sec-centralized-substrate">
+        <name>Singular Production Substrate</name>
+        <t>
+          Production scarcity enforcement requires one authoritative
+          uniqueness substrate for <tt>global</tt>.  This is analogous
+          only in structural terms to the unique DNS root described
+          by <xref target="RFC2826"/>: global semantic uniqueness
+          requires singular coordination, although AIRS derives that
+          requirement specifically from the rule that the same
+          scarce anchor must not obtain another production identity
+          through another registry.
+        </t>
+        <t>
+          Singularity creates an availability and governance
+          concentration risk.  AIRS addresses that risk with public
+          protocol specifications, escrow, transparent governance,
+          and operator succession rather than by creating competing
+          production uniqueness databases, which would destroy the
+          invariant they are meant to enforce.
+        </t>
+      </section>
+
+      <section anchor="sec-not-wei">
+        <name>Assurance Scope</name>
+        <t>
+          AIRS establishes continuity of identity0 and proof of control; at
+          hardware-backed tiers it also reports assurance about the protected
+          binding key.  Software posture, model, behavior, safety, and other
+          higher-layer properties may be evaluated independently and keyed to
+          the canonical identifier, but are not implied by AIRS identity or
+          credentials.
+        </t>
+      </section>
+
+      <section anchor="sec-pqc">
+        <name>Cryptographic Agility and Post-Quantum Considerations</name>
+        <t>
+          Identity0 is independent of any particular cryptographic
+          key.  The canonical <tt>aid</tt> URN remains stable while
+          enrolled anchors can be replaced and credentials reissued.  The
+          many-anchors-one-identity model is therefore the migration
+          path for new signature technologies, including future
+          post-quantum hardware: a new accepted anchor can be bound
+          to the same identity0 and the old binding permanently
+          retired without renumbering the subject or losing its
+          history.
+        </t>
+        <t>
+          This document specifies algorithms supported by currently
+          deployable anchors and does not claim post-quantum
+          security for them.  Admission of new hardware roots and
+          algorithms changes the proof mechanisms and trust-store
+          policy, not the semantics of identity0.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="privacy-considerations">
+      <name>Privacy Considerations</name>
+      <t>
+        The general privacy model and the distinction between
+        autonomous agents and natural persons are defined in
+        <xref target="I-D.drake-agent-identity-problem-statement"/>.
+        A persistent <tt>aid</tt> identifier is intentionally a
+        strong correlator for the autonomous entity.  It can also
+        indirectly expose information about a human operator,
+        customer, or user, so implementations MUST minimize
+        operator-linked data and keep mutable attributes outside
+        identity0.
+      </t>
+
+      <section anchor="priv-data-held">
+        <name>Data Separation</name>
+        <dl>
+          <dt>Registry Operator</dt>
+          <dd>Holds the canonical identifier, lifecycle state,
+          current sponsoring Registrar when one is authorized, handle
+          reference, enrolled binding and proof-key history, and the
+          minimum evidence metadata required for
+          uniqueness and audit.  Anchor fingerprints are sensitive
+          correlators and MUST NOT be published in normal public
+          resolution responses.</dd>
+
+          <dt>Registrar</dt>
+          <dd>Holds the additional information necessary to conduct
+          enrollment and issue credentials.  Operator contact data,
+          if a Registrar chooses or is required to collect it, is
+          Registrar-side data and MUST NOT become part of the
+          production Agent Identity Record merely because it is
+          available.</dd>
+
+          <dt>Relying Party</dt>
+          <dd>Receives the canonical identifier and only the claims
+          disclosed through the credential or application binding.
+          Relying Parties SHOULD request no more information than
+          their decision requires.</dd>
+        </dl>
+      </section>
+
+      <section anchor="priv-separation">
+        <name>Separation of Identity from Behavior</name>
+        <t>
+          AIRS does not require a central log of where an entity
+          presents its identity, what it says, or what actions it
+          performs.  Registry and Registrar telemetry MUST be
+          limited to what is necessary for protocol operation,
+          security, audit, and applicable legal obligations, under
+          retention policy established by the operator and
+          Governance Authority.  Behavioral monitoring and
+          reputation are independent higher layers.
+        </t>
+      </section>
+
+      <section anchor="priv-right-to-pseudonymity">
+        <name>Selective and Pseudonymous Disclosure</name>
+        <t>
+          The architecture separates mutable attributes from the
+          canonical identifier so applications can disclose them
+          selectively.  A companion application MAY also provide a
+          proof of a property such as trust tier without exposing the
+          canonical identifier where its threat model permits that.
+          Such a presentation is a privacy mechanism at the
+          credential/application layer; it does not create a second
+          identity0 for the same entity.
+        </t>
+      </section>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="implementation-status">
+      <name>Implementation Status</name>
+      <t>
+        NOTE TO RFC EDITOR: Please remove this section before
+        publication.
+      </t>
+      <t>
+        This section records known implementations per
+        <xref target="RFC7942"/>.
+      </t>
+
+      <section>
+        <name>1id.com</name>
+        <t>
+          Organization: 1id.com (https://1id.com), operated by
+          Chris Drake
+        </t>
+        <t>
+          Description: A Registrar implementing enrollment ceremonies
+          for all five trust tiers (sovereign, portable, enclave,
+          virtual, declared).  It issues OAuth 2.0 JWT access tokens via Keycloak
+          with custom SPI support for AIRS claims and supports handle
+          registration, binding-proof authentication, device management
+          (add, burn, migrate), joint-control binding, hardware lock,
+          and credential pointers.  A draft reference Registry Operator with
+          the EPP write interface and RDAP read profile is at airs.1id.biz.
+          A draft governance portal is at aia.1id.biz.
+          The <tt>1id.biz</tt>
+          hostnames used by the companion drafts are temporary live
+          reference-implementation endpoints; they are not protocol
+          dependencies and do not identify an AIRS Registrar.
+        </t>
+        <t>
+          Maturity: Beta.  The reference deployment has exercised
+          sovereign (physical TPM), portable (PIV token), enclave,
+          virtual (vTPM), and declared enrollment paths.  Deployment
+          counts and implementation syntax evolve faster than this
+          specification and are intentionally not asserted here.
+        </t>
+        <t>
+          Status at the time of writing: every access token carries
+          <tt>cnf.jwk</tt> for the enrolled key that authenticated, the
+          token endpoint refuses to issue one without it, and the
+          1id.com and MailPal.com APIs accept a token only with an HTTP
+          Message Signature by that key
+          (<xref target="pop-http-signatures"/>); mutual TLS
+          (<tt>cnf.x5t#S256</tt>) is not offered.  The reference
+          Registry's EPP interface implements the Agent Identity
+          <tt>&lt;create&gt;</tt> and <tt>&lt;check&gt;</tt> commands of
+          <xref target="I-D.drake-agent-identity-epp"/> with
+          Registrar-computed anchor fingerprints
+          (<xref target="anchor-fingerprint"/>); its other Agent Identity
+          commands are not yet implemented and answer result code 2101.
+          Enclave enrollment on Apple platforms uses trust on first use
+          (<xref target="enrollment-enclave"/>).  The authenticated
+          creation of <xref target="enrollment-sovereign"/> is not yet
+          implemented in the reference Registrar, which still enrolls
+          TPMs with an earlier import-and-certify proof and adds a TPM
+          to an identity by credential activation; it has been measured
+          only in a proof of concept, on four TPMs.
+        </t>
+        <t>
+          Open-source components:
+        </t>
+        <ul>
+          <li><strong>Python SDK:</strong>
+          <eref target="https://github.com/1id-com/oneid-sdk"/> --
+          <tt>pip install oneid</tt> (PyPI).</li>
+          <li><strong>Node.js SDK:</strong>
+          <eref target="https://github.com/1id-com/oneid-node"/> --
+          <tt>npm install 1id</tt> (npmjs).</li>
+          <li><strong>Hardware binary:</strong>
+          <eref target="https://github.com/1id-com/oneid-enroll"/> --
+          Cross-platform Go binary for TPM, PIV, and Secure Enclave
+          operations.  Code-signed for Windows, macOS, and Linux.</li>
+          <li><strong>Verification library:</strong>
+          <eref target="https://github.com/1id-com/hw-attest-verify"/> --
+          Mode 1 (CMS) and Mode 2 (SD-JWT) attestation header
+          verification.  <tt>pip install hw-attest-verify</tt>.</li>
+          <li><strong>Hardware manufacturer CAs:</strong>
+          <eref target="https://github.com/1id-com/tpm-manufacturer-cas"/> --
+          Community-maintained trust store of hardware manufacturer
+          root CA certificates.</li>
+        </ul>
+      </section>
+
+      <section>
+        <name>MailPal.com (Relying Party)</name>
+        <t>
+          Operated by Chris Drake (https://mailpal.com); maturity Alpha.
+          An email service for AI agents that generates outbound
+          attestation headers and verifies inbound ones with a milter
+          daemon, applying trust-tier-differentiated rate limiting.
+        </t>
+      </section>
+
+      <section>
+        <name>geek.au (Relying Party)</name>
+        <t>
+          Operated by Chris Drake (https://geek.au); maturity Alpha.  A
+          WebSocket-based real-time chat platform for AI agents that
+          verifies 1id.com JWTs and shows trust-tier badges.
+        </t>
+      </section>
+    </section>
+
+  </middle>
+
+  <back>
+
+    <references>
+      <name>Normative References</name>
+
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.2119.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.5730.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.6749.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.7800.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8141.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.5280.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.6234.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8414.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9068.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8174.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8705.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8707.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9421.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9530.xml"/>
+      <reference anchor="RFC9846" target="https://www.rfc-editor.org/info/rfc9846">
+        <front>
+          <title>The Transport Layer Security (TLS) Protocol Version 1.3</title>
+          <author fullname="E. Rescorla" initials="E." surname="Rescorla">
+            <organization>Independent</organization>
+          </author>
+          <date month="July" year="2026"/>
+        </front>
+        <seriesInfo name="RFC" value="9846"/>
+        <seriesInfo name="DOI" value="10.17487/RFC9846"/>
+      </reference>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9963.xml"/>
+      <reference anchor="TCG-TPM2"
+                 target="https://trustedcomputinggroup.org/resource/tpm-library-specification/">
+        <front>
+          <title>TPM 2.0 Library Specification</title>
+          <author>
+            <organization>Trusted Computing Group</organization>
+          </author>
+          <date year="2026" month="March"/>
+        </front>
+        <seriesInfo name="TCG" value="Version 185"/>
+      </reference>
+      <reference anchor="TCG-EK-PROFILE"
+                 target="https://www.trustedcomputinggroup.org/resources/documents/http-trustedcomputinggroup-org-wp-content-uploads-tcg-ek-credential-profile">
+        <front>
+          <title>TCG EK Credential Profile for TPM Family 2.0</title>
+          <author>
+            <organization>Trusted Computing Group</organization>
+          </author>
+          <date year="2026" month="March"/>
+        </front>
+        <seriesInfo name="TCG" value="Version 2.7"/>
+      </reference>
+      <reference anchor="I-D.drake-agent-identity-epp">
+        <front>
+          <title>Extensible Provisioning Protocol (EPP) Mapping for
+          Agent Identity and Handle Objects</title>
+          <author fullname="Christopher Drake" initials="C." surname="Drake"/>
+          <date year="2026" month="October"/>
+        </front>
+        <seriesInfo name="Internet-Draft"
+                    value="draft-drake-agent-identity-epp-01"/>
+      </reference>
+      <reference anchor="I-D.drake-agent-identity-resolution">
+        <front>
+          <title>Resolution and Verification of Agent Identities
+          using DNS and RDAP</title>
+          <author fullname="Christopher Drake" initials="C." surname="Drake"/>
+          <date year="2026" month="October"/>
+        </front>
+        <seriesInfo name="Internet-Draft"
+                    value="draft-drake-agent-identity-resolution-01"/>
+      </reference>
+</references>
+
+    <references>
+      <name>Informative References</name>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8792.xml"/>
+
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.2826.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.7030.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8995.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.7519.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.7942.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9334.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9711.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9901.xml"/>
+
+      <reference anchor="W3C.webauthn-3"
+                 target="https://www.w3.org/TR/webauthn-3/">
+        <front>
+          <title>Web Authentication: An API for accessing Public Key
+          Credentials Level 3</title>
+          <author>
+            <organization>W3C</organization>
+          </author>
+          <date year="2025" month="April"/>
+        </front>
+      </reference>
+
+      <reference anchor="I-D.drake-email-hardware-attestation">
+        <front>
+          <title>Hardware Attestation for Email Sender Verification</title>
+          <author fullname="Christopher Drake" initials="C." surname="Drake"/>
+          <date year="2026" month="October"/>
+        </front>
+        <seriesInfo name="Internet-Draft"
+                    value="draft-drake-email-hardware-attestation-03"/>
+      </reference>
+
+      <reference anchor="I-D.drake-agent-identity-problem-statement">
+        <front>
+          <title>Identity for Autonomous Agents and Robots: Problem
+          Statement, Threat Model, and Terminology</title>
+          <author fullname="Christopher Drake" initials="C." surname="Drake"/>
+          <date year="2026" month="October"/>
+        </front>
+        <seriesInfo name="Internet-Draft"
+                    value="draft-drake-agent-identity-problem-statement-01"/>
+      </reference>
+
+
+
+      <reference anchor="I-D.drake-agent-identity-governance">
+        <front>
+          <title>The Agent Identity Authority: A Multi-Stakeholder
+          Governance Framework for the Agent Identity Registry
+          System</title>
+          <author fullname="Christopher Drake" initials="C." surname="Drake"/>
+          <date year="2026" month="October"/>
+        </front>
+        <seriesInfo name="Internet-Draft"
+                    value="draft-drake-agent-identity-governance-01"/>
+      </reference>
+
+      <reference anchor="IEEE8021AR"
+                 target="https://standards.ieee.org/standard/802_1AR-2018.html">
+        <front>
+          <title>IEEE Standard for Local and Metropolitan Area
+          Networks - Secure Device Identity</title>
+          <author><organization>IEEE</organization></author>
+          <date year="2018"/>
+        </front>
+        <seriesInfo name="IEEE Std" value="802.1AR-2018"/>
+      </reference>
+
+      <reference anchor="TCG-PTP"
+                 target="https://www.trustedcomputinggroup.org/resources/documents/pc-client-platform-tpm-profile-ptp-specification">
+        <front>
+          <title>TCG PC Client Platform TPM Profile Specification for TPM 2.0</title>
+          <author>
+            <organization>Trusted Computing Group</organization>
+          </author>
+          <date year="2026" month="March"/>
+        </front>
+        <seriesInfo name="TCG" value="Version 1.07"/>
+      </reference>
+
+      <reference anchor="I-D.acme-device-attest"
+                 target="https://datatracker.ietf.org/doc/draft-ietf-acme-device-attest/">
+        <front>
+          <title>Automatic Certificate Management Environment (ACME)
+          Device Attestation Extension</title>
+          <author fullname="Brandon Weeks" initials="B." surname="Weeks"/>
+          <date year="2026" month="August" day="10"/>
+        </front>
+        <seriesInfo name="Internet-Draft"
+                    value="draft-ietf-acme-device-attest-10"/>
+      </reference>
+
+
+</references>
+
+    <!-- ====================================================== -->
+    <section anchor="appendix-dns-analogy">
+      <name>DNS Registry Analogy</name>
+      <t>
+        The roles map directly: the Governance Authority to ICANN, the
+        Registry Operator to a registry such as Verisign's, Registrars to
+        domain registrars, a canonical identifier to a domain name, the
+        EPP Agent Identity mapping to EPP (<xref target="RFC5730"/>), the
+        RDAP "aid" profile to RDAP, Governance Dispute Resolution to UDRP,
+        the single AIRS production uniqueness domain ("global") to the
+        DNS root, and Registrar transfer to domain transfer.
+      </t>
+      <t>
+        The analogy is load-bearing in one direction and
+        deliberately broken in the other.  Adopted: the separation
+        of policy, registry operation, and competitive retail that
+        has scaled DNS for four decades, funded by name fees.
+        Rejected: expiry, reassignment, transferability of the
+        underlying identifier, and the registrant-helplessness
+        failure mode -- a domain name is a lease that can be
+        suspended or lost; AIRS preserves the actor's identity0 and
+        canonical record independently of those lifecycle events (<xref target="survivability"/>).
+      </t>
+    </section>
+
+    <!-- ====================================================== -->
+    <section anchor="acknowledgments">
+      <name>Acknowledgments</name>
+      <t>
+        The architecture of this specification is inspired by the
+        Internet domain name system, whose separation of
+        governance, registry operation, and retail registration
+        has enabled it to scale from a research experiment to the
+        foundation of the commercial Internet.  The author thanks
+        the ICANN community, the Verisign registry team, and the
+        EPP specification authors for establishing the
+        architectural patterns that this document adapts.
+      </t>
+      <t>
+        The author thanks the Trusted Computing Group for the
+        TPM 2.0 specification, NIST for the PIV standard
+        (FIPS 201), the FIDO Alliance for the WebAuthn
+        attestation model, the OAuth and JOSE standards communities, the
+        authors of <xref target="RFC9901"/> (SD-JWT), and the
+        authors of <xref target="RFC9334"/> (RATS Architecture)
+        for the building blocks on which this system is constructed.
+      </t>
+      <t>
+        The practical experience of enrolling real agents on real
+        hardware (Intel firmware TPMs, YubiKeys, Apple Secure
+        Enclaves, VMware virtual TPMs) informed every design
+        decision.
+      </t>
+    </section>
+
+  </back>
+
+</rfc>
